@@ -1247,20 +1247,23 @@ function pgCombat(){
   if(selFeats.length>0){
     p.appendChild(mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}}));
     const featSec=CARD([LBL('🏆 Talenti Attivi')]);
+    const chipsDiv=mk('div',{style:{display:'flex',flexWrap:'wrap',gap:'5px',marginBottom:'4px'}});
     selFeats.forEach(ft=>{
-      const row=mk('div',{style:{marginTop:'6px',padding:'6px',background:'rgba(201,168,76,0.06)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'6px',cursor:'pointer'}});
-      row.appendChild(mk('div',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'12px'}},[ft.name]));
-      if(ft.ed)row.appendChild(mk('span',{style:{fontSize:'10px',color:'var(--td)',fontFamily:'monospace'}},[ft.ed]));
-      if(ft.desc)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'12px',marginTop:'4px',lineHeight:'1.5'}},[ft.desc.substring(0,120)+(ft.desc.length>120?'...':'')]));
-      row.addEventListener('click',()=>{
+      const chip=mk('div',{style:{display:'inline-flex',alignItems:'center',gap:'4px',border:'1px solid rgba(201,168,76,0.4)',borderRadius:'5px',padding:'3px 8px',cursor:'pointer',background:'rgba(201,168,76,0.06)',fontSize:'12px',fontFamily:'var(--fb)',color:'var(--gl)',userSelect:'none'}});
+      chip.appendChild(mk('span',null,[ft.name]));
+      if(ft.ed&&ft.ed!=='Custom')chip.appendChild(mk('span',{style:{fontSize:'9px',color:'var(--td)',fontFamily:'monospace',borderLeft:'1px solid var(--border)',paddingLeft:'4px',marginLeft:'2px'}},[ft.ed]));
+      chip.addEventListener('click',()=>{
         const box=CARD([
           ROW([mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'13px'}},[ft.name]),BTN('✕',closeModal,'ghost sm')],{justifyContent:'space-between',marginBottom:'8px'}),
-          mk('div',{style:{color:'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',lineHeight:'1.6'}},[ft.desc||''])
+          ft.ed?mk('span',{style:{fontSize:'10px',color:'var(--td)',fontFamily:'monospace'}},[ft.ed]):mk('span',{},['']),
+          mk('div',{style:{color:'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',lineHeight:'1.6',marginTop:'8px'}},[ft.desc||''])
         ]);
         showModal(box);
       });
-      featSec.appendChild(row);
+      chipsDiv.appendChild(chip);
     });
+    featSec.appendChild(chipsDiv);
+    featSec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'10px',fontFamily:'var(--fb)'}},[selFeats.length+' talento/i — clicca per i dettagli']));
     p.appendChild(featSec);
   }
 
