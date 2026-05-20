@@ -1157,8 +1157,11 @@ function pgCombat(){
   const div1=mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}});
   p.appendChild(div1);
   (()=>{
-    const allSpells=[...(C.cn||[]),...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[]))]
-      .filter(s=>s.pr&&s.cat==='attack');
+    // Trucchetti attacco (sempre, basta categoria) + incantesimi preparati attacco
+    const allSpells=[
+      ...(C.cn||[]).filter(s=>s.cat==='attack'),
+      ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='attack')
+    ];
     const maSec=atkSection(C.ma,'ma','⚡ Attacchi Magici',true);
     if(allSpells.length>0){
       const spOpts=[['','— Importa da Incantesimi —'],...allSpells.map(s=>{const d=lkS(s.n);return[s.n,(d?.it||s.n)+(d?.lv===0?' (Trucchetto)':d?.lv?' (Lv '+d.lv+')':'')];})];
@@ -1176,8 +1179,10 @@ function pgCombat(){
   // ── Buff & Debuff (da incantesimi flaggati "Buff/Debuff") ──
   p.appendChild(mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}}));
   (()=>{
-    const buffSpells=[...(C.cn||[]),...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[]))]
-      .filter(s=>s.pr&&s.cat==='buff');
+    const buffSpells=[
+      ...(C.cn||[]).filter(s=>s.cat==='buff'),
+      ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='buff')
+    ];
     const sec=mk('div');
     sec.appendChild(ROW([LBL('🔮 Buff & Debuff',{color:'var(--purl)'})],{marginBottom:'4px'}));
     if(buffSpells.length===0){
@@ -1203,8 +1208,10 @@ function pgCombat(){
   // ── Cura (da incantesimi flaggati "Cura") ──
   p.appendChild(mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}}));
   (()=>{
-    const healSpells=[...(C.cn||[]),...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[]))]
-      .filter(s=>s.pr&&s.cat==='heal');
+    const healSpells=[
+      ...(C.cn||[]).filter(s=>s.cat==='heal'),
+      ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='heal')
+    ];
     const sec=mk('div');
     sec.appendChild(ROW([LBL('💚 Incantesimi di Cura',{color:'var(--greenl)'})],{marginBottom:'4px'}));
     if(healSpells.length===0){
@@ -1440,6 +1447,11 @@ function pgSpells(){
     C.cn.forEach((s,i)=>{
       const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const d=cu||db;
       const row=mk('div',{cls:'srow'});
+      // Categoria per Combat (trucchetti sempre visibili, basta la categoria)
+      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'68px'}});
+      [['','—'],['attack','Attacco'],['buff','Buff'],['heal','Cura']].forEach(([v,lb])=>{const o=mk('option',{value:v},[lb]);if((s.cat||'')==v)o.selected=true;catSel.appendChild(o);});
+      catSel.addEventListener('change',ev=>{C.cn[i].cat=ev.target.value;save();});
+      row.appendChild(catSel);
       const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted'}});
       nm.textContent=d?.it||s.n;
       nm.addEventListener('click',()=>showSpellModal(s.n));
@@ -2039,8 +2051,8 @@ function pgFeatures(){
 function pgSettings(){
   const p=mk('div',{cls:'page'});
   if(!C.hiddenPages)C.hiddenPages=[];
-  const optionalPages=['features','combo','diario','world','personality'];
-  const labels={features:'⭐ Abilità Classe/Razza/Talenti',combo:'⚡ Combo',diario:'📓 Diario',world:'🗺 Mondo',personality:'🎭 Personalità'};
+  const optionalPages=['combo','diario','world','personality'];
+  const labels={combo:'⚡ Combo',diario:'📓 Diario',world:'🗺 Mondo',personality:'🎭 Personalità'};
   const card=CARD([LBL('Pagine Visibili')]);
   const desc=mk('div',{style:{color:'var(--td)',fontSize:'12px',marginBottom:'10px',lineHeight:'1.6'}});
   desc.textContent='Attiva o disattiva le pagine opzionali. Le pagine disattivate non appariranno nella barra di navigazione.';
@@ -2073,7 +2085,7 @@ function renderNav(){
   const nav=document.getElementById('nav-inner');
   nav.innerHTML='';
   const hiddenPages=C.hiddenPages||[];
-  PAGES.filter(pg=>pg.id==='settings'||!hiddenPages.includes(pg.id)).forEach(pg=>{
+  PAGES.filter(pg=>pg.id==='settings'||pg.id==='features'||!hiddenPages.includes(pg.id)).forEach(pg=>{
     const b=mk('button',{cls:'nb'+(PG===pg.id?' on':'')});
     b.appendChild(mk('span',{cls:'ic'},[pg.ic]));
     b.appendChild(mk('span',{cls:'tx'},[pg.tx]));
