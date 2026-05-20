@@ -1544,8 +1544,17 @@ function pgInventory(){
     row.appendChild(nm);
     if(item.rarity)row.appendChild(mk('span',{style:{color:rarC[item.rarity]||'var(--td)',fontSize:'11px'}},['●']));
     if(item.attuned)row.appendChild(mk('span',{style:{color:'var(--gold)',fontSize:'10px'}},['✦']));
-    if(item.bagOfHolding){const bagBtn=mk('span',{style:{color:'var(--bluel)',fontSize:'10px',cursor:'pointer',border:'1px solid var(--bluel)',borderRadius:'8px',padding:'0 4px'}},['🎒 Borsa']);bagBtn.title='Rimuovi da Borsa Conservante';bagBtn.addEventListener('click',()=>{C.mi[i].bagOfHolding=false;save();render();});row.appendChild(bagBtn);}
-    else{const bagBtn=mk('span',{style:{color:'var(--tk)',fontSize:'10px',cursor:'pointer',border:'1px solid var(--border)',borderRadius:'8px',padding:'0 4px'}},['🎒']);bagBtn.title='Metti nella Borsa Conservante';bagBtn.addEventListener('click',()=>{C.mi[i].bagOfHolding=true;save();render();});row.appendChild(bagBtn);}
+    if(item.bagOfHolding){
+      const bagBtn=mk('span',{style:{color:'var(--bluel)',fontSize:'11px',cursor:'pointer',border:'1px solid var(--bluel)',borderRadius:'8px',padding:'1px 6px',whiteSpace:'nowrap',fontFamily:'var(--fb)',background:'rgba(74,122,203,0.15)'}},['🎒 Borsa']);
+      bagBtn.title='Rimuovi dalla Borsa Conservante';
+      bagBtn.addEventListener('click',()=>{C.mi[i].bagOfHolding=false;save();render();});
+      row.appendChild(bagBtn);
+    } else {
+      const bagBtn=mk('span',{style:{color:'var(--tk)',fontSize:'11px',cursor:'pointer',border:'1px solid var(--border)',borderRadius:'8px',padding:'1px 6px',whiteSpace:'nowrap',fontFamily:'var(--fb)'}},['🎒']);
+      bagBtn.title='Metti nella Borsa Conservante';
+      bagBtn.addEventListener('click',()=>{C.mi[i].bagOfHolding=true;save();render();});
+      row.appendChild(bagBtn);
+    }
     row.appendChild(BTN('✕',()=>{C.mi.splice(i,1);save();render();},'ghost sm'));
     mgCard.appendChild(row);
   });
@@ -1583,6 +1592,40 @@ function pgInventory(){
   p.appendChild(genSec('🧪 Consumabili','con_',['qty'],{name:'',qty:1,desc:''}));
   p.appendChild(genSec('💎 Oggetti di Valore','val',['qty'],{name:'',qty:1,desc:''}));
   p.appendChild(genSec('🎒 Inventario','gen',['qty','weight'],{name:'',qty:1,weight:'',desc:''}));
+
+  // ── Borsa Conservante — raccoglie tutti gli oggetti flaggati ──
+  const bagItems=[];
+  // Da oggetti magici
+  (C.mi||[]).forEach(item=>{if(item.bagOfHolding)bagItems.push({name:item.name||'(senza nome)',src:'✨ Oggetti Magici',color:'var(--purl)'});});
+  // Da sezioni generali
+  const genSections=[['wea','⚔ Armi'],['arm','🛡 Armature'],['con_','🧪 Consumabili'],['val','💎 Oggetti di Valore'],['gen','🎒 Inventario']];
+  genSections.forEach(([key,label])=>{
+    (C[key]||[]).forEach(item=>{
+      if(item.borsa)bagItems.push({name:item.name||'(senza nome)',qty:item.qty,src:label,color:'var(--td)'});
+    });
+  });
+
+  const bagCard=CARD([]);
+  const bagHeader=ROW([
+    mk('span',{style:{color:'var(--bluel)',fontFamily:'var(--ft)',fontSize:'13px',letterSpacing:'1px'}},['🎒 Borsa Conservante']),
+    mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[bagItems.length+' oggett'+(bagItems.length===1?'o':'i')])
+  ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'});
+  bagCard.appendChild(bagHeader);
+  if(bagItems.length===0){
+    bagCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'8px',fontFamily:'var(--fb)'}},[
+      'Nessun oggetto nella borsa. Usa il pulsante 🎒 accanto a ogni oggetto per aggiungerlo.'
+    ]));
+  } else {
+    bagItems.forEach(item=>{
+      const row=mk('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'4px 0',borderBottom:'1px solid rgba(90,62,27,0.15)'}});
+      row.appendChild(mk('span',{style:{color:'var(--bluel)',fontSize:'12px'}},['🎒']));
+      row.appendChild(mk('span',{style:{flex:'1',color:'var(--text)',fontFamily:'var(--fb)',fontSize:'13px'}},[item.name+(item.qty&&item.qty>1?' ×'+item.qty:'')]));
+      row.appendChild(mk('span',{style:{color:'var(--tk)',fontSize:'10px',fontFamily:'monospace',border:'1px solid var(--border)',borderRadius:'3px',padding:'0 4px'}},[item.src]));
+      bagCard.appendChild(row);
+    });
+  }
+  p.appendChild(bagCard);
+
   return p;
 }
 
