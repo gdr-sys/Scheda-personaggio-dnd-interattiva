@@ -2433,6 +2433,8 @@ async function sbOpenScheda(schedaId) {
   }
 
   sbSchedaId = schedaId;
+  // Ricorda questa scheda per il prossimo caricamento
+  if (sbUser) localStorage.setItem('dnd5_last_scheda_' + sbUser.id, schedaId);
 
   // Carica i dati nella variabile globale C dell'app
   const savedData = data.data || {};
@@ -2514,6 +2516,7 @@ async function sbLoadSchedeList() {
 // ╚══════════════════════════════════════════════════════════════╝
 async function sbSwitchScheda() {
   if (sbSchedaId) await sbSaveToCloud();
+  if (sbUser) localStorage.removeItem('dnd5_last_scheda_' + sbUser.id);
   sbLoadSchedeList();
 }
 
@@ -2547,6 +2550,7 @@ async function sbSignIn() {
 
 async function sbSignOut() {
   if (sbSchedaId) await sbSaveToCloud();
+  if (sbUser) localStorage.removeItem('dnd5_last_scheda_' + sbUser.id);
   await sb.auth.signOut();
   sbUser     = null;
   sbSchedaId = null;
@@ -2577,7 +2581,14 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (userInfo) userInfo.style.display  = 'flex';
     if (userName) userName.textContent    = sbUser.email.split('@')[0];
     if (syncEl)   syncEl.style.display    = 'inline';
-    sbLoadSchedeList();
+
+    // Prova a riaprire l'ultima scheda usata
+    const lastId = localStorage.getItem('dnd5_last_scheda_' + sbUser.id);
+    if (lastId) {
+      await sbOpenScheda(lastId);
+    } else {
+      sbLoadSchedeList();
+    }
   } else {
     // ── NON LOGGATO ──
     sbUser     = null;
