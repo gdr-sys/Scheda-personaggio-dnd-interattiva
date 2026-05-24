@@ -2424,10 +2424,20 @@ async function sbOpenScheda(schedaId) {
   const ct = document.getElementById('content');
   ct.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--td);font-family:var(--ft);font-size:13px;letter-spacing:1px">⟳ Caricamento...</div>`;
 
+  // Timeout di sicurezza — se dopo 8 secondi non risponde, va alla lista
+  const timeout = setTimeout(() => {
+    if (!sbSchedaId) {
+      localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
+      sbLoadSchedeList();
+    }
+  }, 8000);
+
   const { data, error } = await sb.from('schede').select('*').eq('id', schedaId).single();
+  clearTimeout(timeout);
 
   if (error || !data) {
-    alert('Errore nel caricare la scheda. Riprova.');
+    // Scheda non trovata (es. eliminata) — rimuovi dal localStorage e vai alla lista
+    localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
     sbLoadSchedeList();
     return;
   }
@@ -2581,6 +2591,9 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (userInfo) userInfo.style.display  = 'flex';
     if (userName) userName.textContent    = sbUser.email.split('@')[0];
     if (syncEl)   syncEl.style.display    = 'inline';
+
+    // Se la scheda è già aperta (es. TOKEN_REFRESHED), non fare nulla
+    if (sbSchedaId) return;
 
     // Prova a riaprire l'ultima scheda usata
     const lastId = localStorage.getItem('dnd5_last_scheda_' + sbUser.id);
