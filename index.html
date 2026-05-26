@@ -2162,19 +2162,23 @@ function pgFeatures(){
     });
   }
 
-  // Separatore aggiungi dal database
-  featCard.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',fontFamily:'var(--ft)',letterSpacing:'1px',textTransform:'uppercase',marginTop:'12px',marginBottom:'6px'}},'Aggiungi dal database'));
+  // Database talenti — collassabile
+  const dbOpen=(C._groupOpen||{})['feat_db']===true;
+  const dbToggleRow=ROW([
+    mk('div',{style:{color:'var(--td)',fontSize:'11px',fontFamily:'var(--ft)',letterSpacing:'1px',textTransform:'uppercase'}},'📚 Aggiungi dal database'),
+    BTN(dbOpen?'▲ Chiudi':'▼ Apri',()=>{if(!C._groupOpen)C._groupOpen={};C._groupOpen['feat_db']=!dbOpen;save();render();},'ghost sm',{style:{fontSize:'11px',padding:'2px 8px'}})
+  ],{justifyContent:'space-between',alignItems:'center',marginTop:'12px',marginBottom:dbOpen?'6px':'0'});
+  featCard.appendChild(dbToggleRow);
 
-  // Filtro per edizione
-  const fedSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:'4px',padding:'4px 6px',fontSize:'12px',marginBottom:'8px',width:'100%'}});
-  [['','Tutti'],['2014','SRD 2014'],['2024','SRD 2024']].forEach(([v,l])=>{const o=mk('option',{value:v},[l]);fedSel.appendChild(o);});
+  if(dbOpen){
+    const fedSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:'4px',padding:'4px 6px',fontSize:'12px',marginBottom:'8px',width:'100%'}});
+    [['','Tutti'],['2014','SRD 2014'],['2024','SRD 2024']].forEach(([v,l])=>{const o=mk('option',{value:v},[l]);fedSel.appendChild(o);});
 
-  // Barra di ricerca
-  const searchInp=mk('input',{type:'text',placeholder:'🔍 Cerca talento...',style:{width:'100%',marginBottom:'6px',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)'}});
+    const searchInp=mk('input',{type:'text',placeholder:'🔍 Cerca talento...',style:{width:'100%',marginBottom:'6px',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)'}});
 
-  const featListDiv=mk('div',{style:{display:'flex',flexDirection:'column',gap:'4px',maxHeight:'300px',overflowY:'auto'}});
+    const featListDiv=mk('div',{style:{display:'flex',flexDirection:'column',gap:'4px',maxHeight:'300px',overflowY:'auto'}});
 
-  function renderFeatList(filter, search){
+    function renderFeatList(filter, search){
     featListDiv.innerHTML='';
     const alreadySel=new Set((C.selectedFeats||[]).map(f=>f.name));
     const q=(search||'').toLowerCase().trim();
@@ -2209,12 +2213,13 @@ function pgFeatures(){
     });
   }
 
-  fedSel.addEventListener('change',ev=>renderFeatList(ev.target.value,searchInp.value));
-  searchInp.addEventListener('input',ev=>renderFeatList(fedSel.value,ev.target.value));
-  renderFeatList('','');
-  featCard.appendChild(fedSel);
-  featCard.appendChild(searchInp);
-  featCard.appendChild(featListDiv);
+    fedSel.addEventListener('change',ev=>renderFeatList(ev.target.value,searchInp.value));
+    searchInp.addEventListener('input',ev=>renderFeatList(fedSel.value,ev.target.value));
+    renderFeatList('','');
+    featCard.appendChild(fedSel);
+    featCard.appendChild(searchInp);
+    featCard.appendChild(featListDiv);
+  } // fine if(dbOpen)
   p.appendChild(featCard);
   return p;
 }
@@ -2264,8 +2269,13 @@ function renderNav(){
     nav.appendChild(b);
   });
 }
+let _isRendering=false;
 function render(){
+  if(_isRendering)return;
+  _isRendering=true;
+  try{
   const ct=document.getElementById('content');
+  if(!ct){_isRendering=false;return;}
   ct.innerHTML='';
   let pg;
   switch(PG){
@@ -2288,6 +2298,22 @@ function render(){
   renderNav();
   // Notifica Supabase del cambiamento dati
   if(typeof sbOnCharChange==='function') sbOnCharChange();
+  }catch(e){
+    console.error('Render error:',e);
+    // Se render crasha, mostra un pulsante di recupero invece di bloccarsi
+    const ct=document.getElementById('content');
+    if(ct){
+      ct.innerHTML='';
+      const errDiv=mk('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',padding:'32px',textAlign:'center'}});
+      errDiv.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'14px'}},['⚠ Errore nel rendering della pagina']));
+      errDiv.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'12px'}},['Torna alla pagina principale per continuare.']));
+      const recBtn=BTN('🏠 Torna al Principale',()=>{PG='main';_isRendering=false;render();},'gold');
+      errDiv.appendChild(recBtn);
+      ct.appendChild(errDiv);
+    }
+  }finally{
+    _isRendering=false;
+  }
 }
 
 // ── EXPORT / IMPORT ──
