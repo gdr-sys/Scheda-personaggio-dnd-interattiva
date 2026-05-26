@@ -2296,24 +2296,25 @@ function render(){
   ct.appendChild(pg);
   updateHdr();
   renderNav();
-  // Notifica Supabase del cambiamento dati
-  if(typeof sbOnCharChange==='function') sbOnCharChange();
   }catch(e){
     console.error('Render error:',e);
-    // Se render crasha, mostra un pulsante di recupero invece di bloccarsi
-    const ct=document.getElementById('content');
-    if(ct){
-      ct.innerHTML='';
-      const errDiv=mk('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',padding:'32px',textAlign:'center'}});
+    const ct2=document.getElementById('content');
+    if(ct2){
+      ct2.innerHTML='';
+      const errDiv=mk('div',{style:{minHeight:'60vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',padding:'32px',textAlign:'center'}});
       errDiv.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'14px'}},['⚠ Errore nel rendering della pagina']));
-      errDiv.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'12px'}},['Torna alla pagina principale per continuare.']));
+      errDiv.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'12px',maxWidth:'280px',lineHeight:'1.6'}},['Si è verificato un errore imprevisto. Torna alla pagina principale.']));
       const recBtn=BTN('🏠 Torna al Principale',()=>{PG='main';_isRendering=false;render();},'gold');
       errDiv.appendChild(recBtn);
-      ct.appendChild(errDiv);
+      ct2.appendChild(errDiv);
     }
+    _isRendering=false;
+    return;
   }finally{
     _isRendering=false;
   }
+  // Solo se render è andato a buon fine, notifica Supabase
+  if(typeof sbOnCharChange==='function') sbOnCharChange();
 }
 
 // ── EXPORT / IMPORT ──
@@ -2476,6 +2477,9 @@ async function sbSaveToCloud() {
 function sbOnCharChange() {
   // localStorage già gestito da save() dell'app originale
   if (!sbUser || !sbSchedaId) return;
+  // Non salvare se siamo in caricamento
+  const ct=document.getElementById('content');
+  if(ct&&ct.innerHTML.includes('Caricamento'))return;
   sbUpdateSync('saving');
   clearTimeout(sbSaveTimer);
   sbSaveTimer = setTimeout(() => sbSaveToCloud(), 1500);
