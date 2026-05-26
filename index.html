@@ -1996,29 +1996,102 @@ function pgFeatures(){
   if(!C.raceFeatures)C.raceFeatures=[];
   if(!C.selectedFeats)C.selectedFeats=[];
 
-  // ── Helper per sezioni ──
+  const ACTION_TYPES=['Azione','Azione Bonus','Reazione','Movimento','Passiva','Turn Start','Risorsa','Altro'];
+  const ACTION_COLORS={
+    'Azione':'var(--rl)',
+    'Azione Bonus':'var(--bluel)',
+    'Reazione':'var(--purl)',
+    'Movimento':'var(--greenl)',
+    'Passiva':'var(--td)',
+    'Turn Start':'var(--gold)',
+    'Risorsa':'#e8a030',
+    'Altro':'var(--tk)',
+  };
+
   function makeFeatureSection(title,color,list,key){
     const sec=CARD([]);
+
+    // Header con titolo e pulsante aggiungi
     sec.appendChild(ROW([
       LBL(title,{marginBottom:'0',color:color}),
-      BTN('+ Aggiungi',()=>{C[key].push({name:'',desc:''});save();render();},'sm')
+      BTN('+ Aggiungi',()=>{C[key].push({name:'',desc:'',actionType:'Passiva',tag:''});save();render();},'sm')
     ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}));
+
+    if((list||[]).length===0){
+      sec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)',textAlign:'center',padding:'8px 0'}},[
+        'Nessuna abilità. Clicca + Aggiungi per iniziare.'
+      ]));
+      return sec;
+    }
+
+    // Raggruppa per tipo azione
+    const groups={};
+    ACTION_TYPES.forEach(t=>{groups[t]=[];});
     (list||[]).forEach((f,i)=>{
-      const isOpen=f._open!==false;
-      const card=mk('div',{style:{marginTop:'6px',border:'1px solid rgba(90,62,27,0.3)',borderRadius:'6px',overflow:'hidden'}});
-      const nameRow=ROW([
-        mk('span',{style:{color:'var(--td)',fontSize:'11px',cursor:'pointer',flexShrink:0}},[isOpen?'▲':'▼']),
-        TI(f.name||'',v=>{C[key][i].name=v;save();},'Nome abilità...',{flex:'1',fontFamily:'var(--ft)',fontSize:'12px',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',borderRadius:'0'}),
-        BTN('✕',()=>{C[key].splice(i,1);save();render();},'ghost sm')
-      ],{gap:'6px',padding:'6px 8px',background:'rgba(0,0,0,0.15)'});
-      nameRow.children[0].addEventListener('click',()=>{C[key][i]._open=!isOpen;save();render();});
-      card.appendChild(nameRow);
-      if(isOpen){
-        const ta=TA(f.desc||'',v=>{C[key][i].desc=v;save();},'Descrizione dell\'abilità...');
-        ta.style.margin='6px';ta.style.width='calc(100% - 12px)';ta.style.minHeight='80px';ta.style.fontSize='13px';
-        card.appendChild(ta);
-      }
-      sec.appendChild(card);
+      const t=f.actionType||'Passiva';
+      if(!groups[t])groups[t]=[];
+      groups[t].push({f,i});
+    });
+
+    ACTION_TYPES.forEach(type=>{
+      const items=groups[type]||[];
+      if(items.length===0)return;
+      const groupColor=ACTION_COLORS[type]||'var(--td)';
+      const groupKey=key+'_group_'+type;
+      const isGroupOpen=(C._groupOpen||{})[groupKey]!==false;
+
+      // Header gruppo collassabile
+      const groupHdr=mk('div',{style:{
+        display:'flex',alignItems:'center',gap:'8px',
+        padding:'5px 8px',marginTop:'8px',marginBottom:'4px',
+        background:'rgba(0,0,0,0.2)',borderRadius:'5px',
+        cursor:'pointer',userSelect:'none',
+        borderLeft:'3px solid '+groupColor,
+      }});
+      groupHdr.appendChild(mk('span',{style:{color:groupColor,fontSize:'11px',fontFamily:'var(--ft)',letterSpacing:'1px',flex:'1',textTransform:'uppercase'}},[type]));
+      groupHdr.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'10px',background:'rgba(255,255,255,0.05)',borderRadius:'8px',padding:'0 6px'}},[String(items.length)]));
+      groupHdr.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[isGroupOpen?'▲':'▼']));
+      groupHdr.addEventListener('click',()=>{
+        if(!C._groupOpen)C._groupOpen={};
+        C._groupOpen[groupKey]=!isGroupOpen;
+        save();render();
+      });
+      sec.appendChild(groupHdr);
+
+      if(!isGroupOpen)return;
+
+      items.forEach(({f,i})=>{
+        const isOpen=f._open!==false;
+        const card=mk('div',{style:{marginTop:'4px',border:'1px solid rgba(90,62,27,0.3)',borderRadius:'6px',overflow:'hidden'}});
+
+        // Nome row con tipo azione e tag
+        const nameRow=mk('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'5px 8px',background:'rgba(0,0,0,0.15)'}});
+        const tog=mk('span',{style:{color:'var(--td)',fontSize:'11px',cursor:'pointer',flexShrink:0}},[isOpen?'▲':'▼']);
+        tog.addEventListener('click',()=>{C[key][i]._open=!isOpen;save();render();});
+        nameRow.appendChild(tog);
+        nameRow.appendChild(TI(f.name||'',v=>{C[key][i].name=v;save();},'Nome abilità...',{flex:'1',fontFamily:'var(--ft)',fontSize:'12px',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',borderRadius:'0'}));
+        // Tag classe/razza opzionale
+        nameRow.appendChild(TI(f.tag||'',v=>{C[key][i].tag=v;save();},'Tag...',{width:'70px',fontSize:'10px',color:'var(--td)',background:'transparent',border:'none',borderBottom:'1px solid rgba(90,62,27,0.3)',borderRadius:'0'}));
+        nameRow.appendChild(BTN('✕',()=>{C[key].splice(i,1);save();render();},'ghost sm'));
+        card.appendChild(nameRow);
+
+        if(isOpen){
+          // Selettore tipo azione
+          const typeSel=mk('select',{style:{background:'var(--card)',border:'none',borderBottom:'1px solid var(--border)',color:groupColor,borderRadius:'0',padding:'3px 6px',fontSize:'11px',width:'calc(100% - 12px)',margin:'4px 6px 0',display:'block'}});
+          ACTION_TYPES.forEach(t=>{
+            const o=mk('option',{value:t},[t]);
+            if((f.actionType||'Passiva')===t)o.selected=true;
+            typeSel.appendChild(o);
+          });
+          typeSel.addEventListener('change',ev=>{C[key][i].actionType=ev.target.value;save();render();});
+          card.appendChild(typeSel);
+
+          const ta=TA(f.desc||'',v=>{C[key][i].desc=v;save();},'Descrizione...');
+          ta.style.margin='4px 6px 6px';ta.style.width='calc(100% - 12px)';ta.style.minHeight='70px';ta.style.fontSize='12px';
+          card.appendChild(ta);
+        }
+        sec.appendChild(card);
+      });
     });
     return sec;
   }
@@ -2030,33 +2103,64 @@ function pgFeatures(){
   const featCard=CARD([]);
   featCard.appendChild(ROW([
     LBL('🏆 Talenti',{marginBottom:'0',color:'var(--gl)'}),
-    BTN('+ Personalizzato',()=>{C.selectedFeats.push({name:'',desc:'',ed:'Custom'});save();render();},'sm')
+    BTN('+ Personalizzato',()=>{C.selectedFeats.push({name:'',desc:'',ed:'Custom',actionType:'Passiva'});save();render();},'sm')
   ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}));
 
-  // Talenti selezionati
-  (C.selectedFeats||[]).forEach((ft,i)=>{
-    const isOpen=ft._open!==false;
-    const card=mk('div',{style:{marginTop:'6px',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'6px',overflow:'hidden'}});
-    const nameRow=ROW([
-      mk('span',{style:{color:'var(--td)',fontSize:'11px',cursor:'pointer',flexShrink:0}},[isOpen?'▲':'▼']),
-      mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'12px',flex:'1'}},[ft.name||'Talento']),
-      ft.ed?mk('span',{style:{fontSize:'10px',color:'var(--td)',fontFamily:'monospace',border:'1px solid var(--border)',borderRadius:'3px',padding:'0 4px'}},[ft.ed]):mk('span',{},['']),
-      BTN('✕',()=>{C.selectedFeats.splice(i,1);save();render();},'ghost sm')
-    ],{gap:'6px',padding:'6px 8px',background:'rgba(201,168,76,0.06)'});
-    nameRow.children[0].addEventListener('click',()=>{C.selectedFeats[i]._open=!isOpen;save();render();});
-    card.appendChild(nameRow);
-    if(isOpen){
-      if(ft.ed==='Custom'){
-        const nI=TI(ft.name||'',v=>{C.selectedFeats[i].name=v;save();},'Nome talento',{fontSize:'12px',margin:'6px 6px 0'});
-        nI.style.width='calc(100% - 12px)';
-        card.appendChild(nI);
-      }
-      const ta=TA(ft.desc||'',v=>{C.selectedFeats[i].desc=v;save();},'Descrizione...');
-      ta.style.margin='6px';ta.style.width='calc(100% - 12px)';ta.style.minHeight='70px';ta.style.fontSize='12px';
-      card.appendChild(ta);
-    }
-    featCard.appendChild(card);
-  });
+  // Talenti selezionati raggruppati per tipo azione
+  if((C.selectedFeats||[]).length>0){
+    const featGroups={};
+    ACTION_TYPES.forEach(t=>{featGroups[t]=[];});
+    (C.selectedFeats||[]).forEach((ft,i)=>{
+      const t=ft.actionType||'Passiva';
+      if(!featGroups[t])featGroups[t]=[];
+      featGroups[t].push({ft,i});
+    });
+
+    ACTION_TYPES.forEach(type=>{
+      const items=featGroups[type]||[];
+      if(items.length===0)return;
+      const groupColor=ACTION_COLORS[type]||'var(--td)';
+      const groupKey='feats_group_'+type;
+      const isGroupOpen=(C._groupOpen||{})[groupKey]!==false;
+
+      const groupHdr=mk('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'5px 8px',marginTop:'6px',marginBottom:'3px',background:'rgba(0,0,0,0.2)',borderRadius:'5px',cursor:'pointer',userSelect:'none',borderLeft:'3px solid '+groupColor}});
+      groupHdr.appendChild(mk('span',{style:{color:groupColor,fontSize:'11px',fontFamily:'var(--ft)',letterSpacing:'1px',flex:'1',textTransform:'uppercase'}},[type]));
+      groupHdr.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'10px',background:'rgba(255,255,255,0.05)',borderRadius:'8px',padding:'0 6px'}},[String(items.length)]));
+      groupHdr.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[isGroupOpen?'▲':'▼']));
+      groupHdr.addEventListener('click',()=>{if(!C._groupOpen)C._groupOpen={};C._groupOpen[groupKey]=!isGroupOpen;save();render();});
+      featCard.appendChild(groupHdr);
+
+      if(!isGroupOpen)return;
+
+      items.forEach(({ft,i})=>{
+        const isOpen=ft._open!==false;
+        const card=mk('div',{style:{marginTop:'4px',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'6px',overflow:'hidden'}});
+        const nameRow=ROW([
+          mk('span',{style:{color:'var(--td)',fontSize:'11px',cursor:'pointer',flexShrink:0}},[isOpen?'▲':'▼']),
+          mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'12px',flex:'1'}},[ft.name||'Talento']),
+          ft.ed?mk('span',{style:{fontSize:'10px',color:'var(--td)',fontFamily:'monospace',border:'1px solid var(--border)',borderRadius:'3px',padding:'0 4px'}},[ft.ed]):mk('span',{},['']),
+          BTN('✕',()=>{C.selectedFeats.splice(i,1);save();render();},'ghost sm')
+        ],{gap:'6px',padding:'5px 8px',background:'rgba(201,168,76,0.06)'});
+        nameRow.children[0].addEventListener('click',()=>{C.selectedFeats[i]._open=!isOpen;save();render();});
+        card.appendChild(nameRow);
+        if(isOpen){
+          const typeSel=mk('select',{style:{background:'var(--card)',border:'none',borderBottom:'1px solid var(--border)',color:groupColor,borderRadius:'0',padding:'3px 6px',fontSize:'11px',width:'calc(100% - 12px)',margin:'4px 6px 0',display:'block'}});
+          ACTION_TYPES.forEach(t=>{const o=mk('option',{value:t},[t]);if((ft.actionType||'Passiva')===t)o.selected=true;typeSel.appendChild(o);});
+          typeSel.addEventListener('change',ev=>{C.selectedFeats[i].actionType=ev.target.value;save();render();});
+          card.appendChild(typeSel);
+          if(ft.ed==='Custom'){
+            const nI=TI(ft.name||'',v=>{C.selectedFeats[i].name=v;save();},'Nome talento',{fontSize:'12px',margin:'4px 6px 0'});
+            nI.style.width='calc(100% - 12px)';
+            card.appendChild(nI);
+          }
+          const ta=TA(ft.desc||'',v=>{C.selectedFeats[i].desc=v;save();},'Descrizione...');
+          ta.style.margin='4px 6px 6px';ta.style.width='calc(100% - 12px)';ta.style.minHeight='60px';ta.style.fontSize='12px';
+          card.appendChild(ta);
+        }
+        featCard.appendChild(card);
+      });
+    });
+  }
 
   // Separatore aggiungi dal database
   featCard.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',fontFamily:'var(--ft)',letterSpacing:'1px',textTransform:'uppercase',marginTop:'12px',marginBottom:'6px'}},'Aggiungi dal database'));
