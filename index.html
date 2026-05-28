@@ -1292,7 +1292,7 @@ function pgCombat(){
         card.appendChild(DIV([LBL('Danno = dado + stat + extra')],{marginTop:'4px'}));
         card.appendChild(GRID([
           DIV([LBL('Dado'),TI(a.dmg||'',v=>{C[key][i].dmg=v;save();},'1d8',{})]),
-          DIV([LBL('+ Car.'),STATSEL_DMG(atk.dmgStat||atk.stat||'str',v=>{C[key][i].dmgStat=v;save();})]),
+          DIV([LBL('+ Car.'),STATSEL_DMG(a.dmgStat||a.stat||'str',v=>{C[key][i].dmgStat=v;save();})]),
           DIV([LBL('+ Extra'),(()=>{let t;const n=NI(a.ex||0,v=>{C[key][i].ex=v;save();clearTimeout(t);t=setTimeout(render,700);},undefined,undefined,{width:'100%'});return n;})()]),
           DIV([LBL('Tipo'),TI(a.dt||'',v=>{C[key][i].dt=v;save();},'Perforanti',{})]),
           DIV([LBL('Critico'),TI(a.cd||'',v=>{C[key][i].cd=v;save();},'2d8',{})]),
