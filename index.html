@@ -340,11 +340,161 @@ function sm(s){return Math.floor(((s||10)-10)/2);}
 function profByLevel(lv){return lv>=17?6:lv>=13?5:lv>=9?4:lv>=5?3:2;}
 function fm(n){return n>=0?'+'+n:''+n;}
 function roll(f){
-  const m=(f||'1d6').match(/(\d+)d(\d+)([+-]\d+)?/i);
-  if(!m)return{t:0,r:[],f};
-  const n=parseInt(m[1]),s=parseInt(m[2]),b=parseInt(m[3]||'0');
-  const r=Array.from({length:n},()=>Math.floor(Math.random()*s)+1);
-  return{t:r.reduce((a,b)=>a+b,0)+b,r,f};
+  if(!f||!f.trim())return{t:0,r:[],f:'0'};
+  // Gestisce formule come "2d6+3", "1d8", "5", "2d6+1d4+3"
+  let total=0;const allRolls=[];
+  const formula=String(f).trim();
+  // Separa in termini (es. "2d6+1d4+3" → ["2d6","1d4","3"])
+  const terms=formula.replace(/\s/g,'').match(/[+-]?[^+-]+/g)||[];
+  terms.forEach(term=>{
+    const sign=term.startsWith('-')?-1:1;
+    const t=term.replace(/^[+-]/,'');
+    const dm=t.match(/^(\d+)d(\d+)$/i);
+    if(dm){
+      const n=parseInt(dm[1]),s=parseInt(dm[2]);
+      const r=Array.from({length:n},()=>Math.floor(Math.random()*s)+1);
+      allRolls.push(...r.map(v=>sign*v));
+      total+=sign*r.reduce((a,b)=>a+b,0);
+    } else {
+      const v=parseInt(t)||0;
+      total+=sign*v;
+      if(v!==0)allRolls.push(sign*v);
+    }
+  });
+  return{t:total,r:allRolls,f:formula};
+}
+
+// Funzione helper per costruire formula danni con stat e extra
+function buildDmgFormula(dmgDice, statKey, extraBonus){
+  const S={str:sm(C.str),dex:sm(C.dex),con:sm(C.con),int:sm(C.int),wis:sm(C.wis),cha:sm(C.cha)};
+  let formula=dmgDice||'1d4';
+  const statMod=S[statKey]||0;
+  const extra=Number(extraBonus)||0;
+  if(statMod>0)formula+='+'+statMod;
+  else if(statMod<0)formula+=statMod;
+  if(extra>0)formula+='+'+extra;
+  else if(extra<0)formula+=extra;
+  return formula;
+}
+
+// Popup dado migliorato — mostra tiro colpire + danni separati
+function showAttackRoll(atk, isSpell){
+  const S={str:sm(C.str),dex:sm(C.dex),con:sm(C.con),int:sm(C.int),wis:sm(C.wis),cha:sm(C.cha)};
+  const pb=C.prof||2;
+  const statKey=atk.stat||'str';
+  const statMod=S[statKey]||0;
+  const hasPr=!!atk.pr;
+  const extra=Number(atk.ex)||0;
+  const hitBonus=statMod+(hasPr?pb:0)+extra;
+
+  // Tiro per colpire
+  const hitRoll=roll('1d20');
+  const hitD20=hitRoll.r[0];
+  const isCrit=hitD20===20;
+  const isFumble=hitD20===1;
+  const hitTotal=hitD20+hitBonus;
+
+  // Formula danni
+  const dmgStatKey=atk.dmgStat||atk.stat||'str';
+  const dmgMod=S[dmgStatKey]||0;
+  const dmgExtra=Number(atk.ex)||0;
+  const dmgDice=atk.dmg||'1d6';
+
+  let dmgFormula=dmgDice;
+  if(dmgMod>0)dmgFormula+='+'+dmgMod;
+  else if(dmgMod<0)dmgFormula+=dmgMod;
+  if(dmgExtra>0)dmgFormula+='+'+dmgExtra;
+  else if(dmgExtra<0)dmgFormula+=dmgExtra;
+
+  // Tiro danni
+  let dmgResult, critResult=null;
+  if(isCrit && atk.cd){
+    critResult=roll(atk.cd);
+  } else {
+    dmgResult=roll(dmgFormula);
+  }
+
+  // Costruisci il popup
+  const p=document.getElementById('rpop');
+  p.innerHTML='';
+
+  // Titolo
+  const titleColor=isCrit?'var(--gl)':isFumble?'var(--rl)':'var(--td)';
+  p.appendChild(mk('div',{style:{color:titleColor,fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},
+    [atk.n||(isSpell?'Incantesimo':'Attacco'),(isCrit?' ⭐ CRITICO!':(isFumble?' 💀 MANCATO!':''))]
+  ));
+
+  const row=mk('div',{style:{display:'flex',gap:'10px',alignItems:'flex-start'}});
+
+  // Colonna: Colpire
+  const hitCol=mk('div',{style:{textAlign:'center',flex:'1'}});
+  hitCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['COLPIRE']));
+  hitCol.appendChild(mk('div',{style:{color:isCrit?'var(--gl)':isFumble?'var(--rl)':'var(--text)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(hitTotal)]));
+  // Breakdown
+  let hitBreak='d20('+hitD20+')';
+  if(statMod!==0)hitBreak+=(statMod>0?'+':'')+statMod+'('+statKey.toUpperCase()+')';
+  if(hasPr)hitBreak+=(pb>0?'+':'')+pb+'(comp)';
+  if(extra!==0)hitBreak+=(extra>0?'+':'')+extra;
+  hitCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px',lineHeight:'1.3'}},[hitBreak]));
+  row.appendChild(hitCol);
+
+  // Separatore
+  row.appendChild(mk('div',{style:{width:'1px',background:'var(--border)',alignSelf:'stretch'}}));
+
+  // Colonna: Danni
+  const dmgCol=mk('div',{style:{textAlign:'center',flex:'1'}});
+  if(isCrit&&atk.cd){
+    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['CRITICO']));
+    dmgCol.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(critResult.t)]));
+    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px'}},[atk.cd+' → ['+critResult.r.join(',')+']']));
+  } else {
+    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['DANNI']));
+    dmgCol.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(dmgResult.t)]));
+    let dmgBreak=dmgDice+'['+dmgResult.r.slice(0,dmgResult.r.findIndex((_,i,a)=>{let s=0;for(let j=0;j<=i;j++)s+=Math.abs(a[j]);return false;})||dmgResult.r.map(r=>Math.abs(r))).join(',')+']';
+    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px'}},[dmgFormula]));
+  }
+  row.appendChild(dmgCol);
+  p.appendChild(row);
+
+  p.style.display='block';
+  clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',6000);
+}
+
+// Popup per incantesimo con CD
+function showSpellRollPopup(spellName, dmgDice, saveAttr){
+  const S={str:sm(C.str),dex:sm(C.dex),con:sm(C.con),int:sm(C.int),wis:sm(C.wis),cha:sm(C.cha)};
+  const pb=C.prof||2;
+  const scaMod=S[C.sca||'int']||0;
+  const spCD=8+pb+scaMod;
+
+  const p=document.getElementById('rpop');
+  p.innerHTML='';
+  p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
+
+  const row=mk('div',{style:{display:'flex',gap:'10px',alignItems:'flex-start'}});
+
+  if(saveAttr){
+    // Mostra CD
+    const cdCol=mk('div',{style:{textAlign:'center',flex:'1'}});
+    cdCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['CD TS']));
+    cdCol.appendChild(mk('div',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(spCD)]));
+    cdCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px'}},['8+'+pb+'(comp)+'+scaMod+'('+((C.sca||'int').toUpperCase())+')']));
+    row.appendChild(cdCol);
+    row.appendChild(mk('div',{style:{width:'1px',background:'var(--border)',alignSelf:'stretch'}}));
+  }
+
+  if(dmgDice){
+    const dmgResult=roll(dmgDice);
+    const dmgCol=mk('div',{style:{textAlign:'center',flex:'1'}});
+    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['DANNI']));
+    dmgCol.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(dmgResult.t)]));
+    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px'}},[dmgDice+' → ['+dmgResult.r.join(',')+']']));
+    row.appendChild(dmgCol);
+  }
+
+  p.appendChild(row);
+  p.style.display='block';
+  clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',6000);
 }
 
 // DOM builder — NEVER causes re-render
@@ -1126,15 +1276,7 @@ function pgCombat(){
       const nameRow=ROW([
         toggleArr,
         TI(a.n||'',v=>{C[key][i].n=v;save();},'Nome attacco',{flex:'1',fontFamily:'var(--ft)',fontSize:'12px'}),
-        BTN('⚄',()=>{
-          const hit=roll('1d20'+fm(bon));const dmg=roll(a.dmg||'1d6');const cr=roll(a.cd||a.dmg||'1d6');
-          const isCrit=hit.r[0]===20;rp.innerHTML='';
-          rp.appendChild(mk('div',{style:{color:isCrit?'var(--gl)':'var(--td)',fontFamily:'var(--ft)',fontSize:'11px'}},[a.n+(isCrit?' ⭐ CRITICO!':'')]));
-          const rr=mk('div',{style:{display:'flex',gap:'10px',marginTop:'4px'}});
-          rr.appendChild(DIV([mk('div',{style:{color:'var(--td)',fontSize:'10px'}},['Colpire']),mk('div',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'20px'}},[String(hit.t)]),mk('div',{style:{color:'var(--td)',fontSize:'9px'}},['['+hit.r.join(',')+']'])],{}));
-          rr.appendChild(DIV([mk('div',{style:{color:'var(--td)',fontSize:'10px'}},[isCrit?'Crit':'Danni']),mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'20px'}},[String(isCrit?cr.t:dmg.t)]),mk('div',{style:{color:'var(--td)',fontSize:'9px'}},['['+dmg.r.join(',')+']'])],{}));
-          rp.appendChild(rr);rp.style.display='block';clearTimeout(rpt);rpt=setTimeout(()=>rp.style.display='none',5000);
-        },'gold sm'),
+        BTN('⚄',()=>{ showAttackRoll(a, isM); },'gold sm'),
         BTN('✕',()=>{C[key].splice(i,1);save();render();},'ghost sm')
       ],{marginBottom:isOpen?'4px':'0'});
       card.appendChild(nameRow);
@@ -1470,6 +1612,8 @@ function pgSpells(){
       if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
       if(d?.du&&d.du.includes('Conc'))row.appendChild(mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},['C']));
       if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
+      // Dado danni/CD se applicabile
+      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
       row.appendChild(BTN('✕',()=>{C.cn.splice(i,1);save();render();},'ghost sm'));
       tCard.appendChild(row);
     });
@@ -1498,6 +1642,8 @@ function pgSpells(){
       if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
       if(d?.du&&d.du.includes('Conc'))row.appendChild(mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},['C']));
       if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
+      // Dado danni/CD
+      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
       row.appendChild(BTN('✕',()=>{C.sl[l].splice(i,1);save();render();},'ghost sm'));
       lCard.appendChild(row);
     });
