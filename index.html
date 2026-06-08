@@ -1968,39 +1968,60 @@ function pgDiario(){
   if(!C.notes)C.notes=[];
 
   p.appendChild(ROW([
-    mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'14px'}},['📓 Diario']),
-    BTN('+ Aggiungi Nota',()=>{C.notes.unshift({title:'Nuova nota',body:'',open:true,date:new Date().toLocaleDateString('it-IT')});save();render();},'gold sm')
-  ],{justifyContent:'space-between',alignItems:'center'}));
+    mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'14px',letterSpacing:'1px'}},['📓 Diario']),
+    BTN('+ Nuova Nota',()=>{
+      C.notes.unshift({title:'',body:'',open:true,date:new Date().toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'})});
+      save();render();
+    },'gold sm')
+  ],{justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}));
 
   if(!C.notes.length){
-    p.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'13px',textAlign:'center',padding:'24px',fontFamily:'var(--fb)'}},[
-      'Nessuna nota ancora.',mk('br'),'Clicca + Aggiungi Nota per iniziare.'
-    ]));
+    p.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'13px',textAlign:'center',padding:'32px',fontFamily:'var(--fb)'}},
+      ['Nessuna nota ancora.',mk('br'),'Clicca + Nuova Nota per iniziare.']
+    ));
+    return p;
   }
 
   C.notes.forEach((note,i)=>{
-    const card=CARD([]);
+    const isOpen=note.open===true;
+    const card=mk('div',{style:{
+      marginBottom:'6px',
+      border:'1px solid '+(isOpen?'var(--border)':'rgba(90,62,27,0.3)'),
+      borderRadius:'8px',overflow:'hidden',
+      background:isOpen?'var(--card)':'transparent',
+    }});
 
-    // Header: title (clickable to collapse) + date + delete
-    const titleI=TI(note.title||'',v=>{C.notes[i].title=v;save();},'Titolo nota...',{
-      flex:'1',fontFamily:'var(--ft)',fontSize:'13px',color:'var(--gl)',
-      background:'transparent',border:'none',borderBottom:'1px solid var(--border)',borderRadius:'0'
-    });
-    const arrow=mk('span',{style:{color:'var(--td)',fontSize:'13px',cursor:'pointer',flexShrink:0}},[ note.open!==false?'▲':'▼' ]);
-    arrow.addEventListener('click',()=>{C.notes[i].open=note.open===false;save();render();});
-    titleI.addEventListener('click',()=>{C.notes[i].open=note.open===false;save();render();});
+    const hdr=mk('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'9px 12px',cursor:'pointer',background:isOpen?'rgba(0,0,0,0.2)':'transparent'}});
+    hdr.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px',flexShrink:0,userSelect:'none'}},[isOpen?'▲':'▼']));
 
-    const dateEl=mk('span',{style:{color:'var(--tk)',fontSize:'10px',flexShrink:0}},[note.date||'']);
-    card.appendChild(ROW([arrow,titleI,dateEl,BTN('✕',()=>{if(confirm('Eliminare questa nota?')){C.notes.splice(i,1);save();render();}},'ghost sm')],{gap:'6px',marginBottom:note.open!==false?'8px':'0'}));
+    const titleI=mk('input',{type:'text',value:note.title||'',placeholder:'Titolo sessione...',style:{flex:'1',fontFamily:'var(--ft)',fontSize:'12px',color:'var(--gl)',background:'transparent',border:'none',outline:'none',minWidth:0}});
+    titleI.addEventListener('change',ev=>{C.notes[i].title=ev.target.value;save();});
+    titleI.addEventListener('click',ev=>ev.stopPropagation());
+    hdr.appendChild(titleI);
 
-    if(note.open!==false){
-      card.appendChild(TA(note.body||'',v=>{C.notes[i].body=v;save();},'Scrivi qui i tuoi appunti...',{width:'100%',minHeight:'100px'}));
+    const dateI=mk('input',{type:'text',value:note.date||'',placeholder:'gg/mm/aa',style:{width:'68px',fontSize:'10px',color:'var(--tk)',fontFamily:'var(--fb)',background:'transparent',border:'none',outline:'none',textAlign:'right',flexShrink:0}});
+    dateI.addEventListener('change',ev=>{C.notes[i].date=ev.target.value;save();});
+    dateI.addEventListener('click',ev=>ev.stopPropagation());
+    hdr.appendChild(dateI);
+
+    const delBtn=BTN('✕',()=>{if(confirm('Eliminare questa nota?')){C.notes.splice(i,1);save();render();}},'ghost sm',{style:{padding:'0 4px',fontSize:'11px',flexShrink:0}});
+    delBtn.addEventListener('click',ev=>ev.stopPropagation());
+    hdr.appendChild(delBtn);
+
+    hdr.addEventListener('click',()=>{C.notes[i].open=!isOpen;save();render();});
+    card.appendChild(hdr);
+
+    if(isOpen){
+      const body=mk('div',{style:{padding:'8px 12px 12px'}});
+      const ta=TA(note.body||'',v=>{C.notes[i].body=v;save();},'Scrivi qui gli appunti della sessione...');
+      ta.style.width='100%';ta.style.minHeight='120px';ta.style.fontSize='13px';ta.style.lineHeight='1.6';
+      body.appendChild(ta);
+      card.appendChild(body);
     }
     p.appendChild(card);
   });
   return p;
 }
-
 function pgWorld(){
   const p=mk('div',{cls:'page'});
 
