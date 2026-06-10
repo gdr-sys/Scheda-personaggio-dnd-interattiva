@@ -923,10 +923,12 @@ function pgMain(){
       subInp.addEventListener('change',ev=>{C.classes[ci].sub=ev.target.value;if(ci===0)C.sub=ev.target.value;save();});
       row.appendChild(subInp);
       // Livello
-      const lvInp=mk('input',{type:'number',value:String(cl.lv||1),min:'1',max:'20',style:{width:'36px',textAlign:'center',fontSize:'13px',color:'var(--text)',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',outline:'none'}});
+      const lvInp=mk('input',{type:'number',value:String(cl.lv||1),min:'1',max:'20',style:{width:'40px',textAlign:'center',fontSize:'13px',color:'var(--text)',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',padding:'2px 4px',outline:'none'}});
       lvInp.addEventListener('change',ev=>{
-        C.classes[ci].lv=Math.max(1,Math.min(20,Number(ev.target.value)||1));
-        C.lv=C.classes.reduce((s,c)=>s+(Number(c.lv)||0),0);
+        const newLv=Math.max(1,Math.min(20,Number(ev.target.value)||1));
+        C.classes[ci].lv=newLv;
+        const tot=C.classes.reduce((s,c)=>s+(Number(c.lv)||0),0);
+        C.lv=tot;
         if(!C.profManual)C.prof=profByLevel(C.lv);
         save();render();
       });
@@ -2978,37 +2980,60 @@ async function sbOpenScheda(schedaId) {
   const ct = document.getElementById('content');
   ct.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--td);font-family:var(--ft);font-size:13px;letter-spacing:1px">⟳ Caricamento...</div>`;
 
-  // Timeout di sicurezza — se dopo 8 secondi non risponde, va alla lista
+  // Timeout di sicurezza — se dopo 10 secondi non risponde, va alla lista
   const timeout = setTimeout(() => {
     if (!sbSchedaId) {
       localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
       sbLoadSchedeList();
     }
-  }, 8000);
+  }, 10000);
 
-  const { data, error } = await sb.from('schede').select('*').eq('id', schedaId).single();
+  let data, error;
+  try {
+    const res = await sb.from('schede').select('*').eq('id', schedaId).single();
+    data = res.data; error = res.error;
+  } catch(e) {
+    error = e;
+  }
   clearTimeout(timeout);
 
   if (error || !data) {
-    // Scheda non trovata (es. eliminata) — rimuovi dal localStorage e vai alla lista
     localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
     sbLoadSchedeList();
     return;
   }
 
   sbSchedaId = schedaId;
-  // Ricorda questa scheda per il prossimo caricamento
   if (sbUser) localStorage.setItem('dnd5_last_scheda_' + sbUser.id, schedaId);
 
-  // Carica i dati nella variabile globale C dell'app
+  // Deep merge — preserva arrays come classes, notes, ecc.
   const savedData = data.data || {};
-  C = { ...JSON.parse(JSON.stringify(DEF)), ...savedData };
+  const base = JSON.parse(JSON.stringify(DEF));
+  C = { ...base, ...savedData };
+  // Garantisce che gli array critici esistano sempre
+  if(!C.classes)C.classes=[];
+  if(!C.notes)C.notes=[];
+  if(!C.noteTags)C.noteTags=[];
+  if(!C.selectedFeats)C.selectedFeats=[];
+  if(!C.classFeatures)C.classFeatures=[];
+  if(!C.raceFeatures)C.raceFeatures=[];
+  if(!C.conditions)C.conditions=[];
+  if(!C.sp)C.sp={str:false,dex:false,con:false,int:false,wis:false,cha:false};
+  if(!C.spBonus)C.spBonus={str:0,dex:0,con:0,int:0,wis:0,cha:0};
+  if(!C.skBonus)C.skBonus={};
+  if(!C.ss)C.ss={1:{m:0,u:0},2:{m:0,u:0},3:{m:0,u:0},4:{m:0,u:0},5:{m:0,u:0},6:{m:0,u:0},7:{m:0,u:0},8:{m:0,u:0},9:{m:0,u:0}};
+  if(!C.sk||!C.sk.acrobazia)C.sk=JSON.parse(JSON.stringify(DEF.sk));
 
-  // Ripristina interfaccia normale
   document.getElementById('nav').style.display = '';
   ct.innerHTML = '';
 
-  render();
+  try {
+    render();
+  } catch(e) {
+    console.error('Render error after load:', e);
+    PG = 'main';
+    try { render(); } catch(e2) { console.error('Render main failed too:', e2); }
+  }
   sbUpdateSync('saved');
 }
 
@@ -3167,7 +3192,8 @@ sb.auth.onAuthStateChange(async (event, session) => {
     // Prova a riaprire l'ultima scheda usata
     const lastId = localStorage.getItem('dnd5_last_scheda_' + sbUser.id);
     if (lastId) {
-      await sbOpenScheda(lastId);
+      // Piccolo delay per assicurarsi che il DOM sia pronto
+      setTimeout(() => sbOpenScheda(lastId), 100);
     } else {
       sbLoadSchedeList();
     }
