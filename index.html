@@ -1927,13 +1927,11 @@ function pgInventory(){
   // ── Peso Inventario ──
   const carryNormal=C.str*5;
   const carryMax=C.str*10;
-  const totalWeight=[
-    ...(C.wea||[]).reduce((s,i)=>s+(Number(i.weight)||0)*(Number(i.qty)||1),0),
-    ...[0]
-  ].reduce((a,b)=>a+b,0)
-  + (C.arm||[]).reduce((s,i)=>s+(Number(i.weight)||0),0)
-  + (C.gen||[]).reduce((s,i)=>s+(Number(i.weight)||0)*(Number(i.qty)||1),0)
-  + (C.mi||[]).reduce((s,i)=>s+(Number(i.weight)||0),0);
+  const totalWeight=
+    (C.wea||[]).reduce((s,i)=>s+(Number(i.weight)||0)*(Number(i.qty)||1),0)
+    + (C.arm||[]).reduce((s,i)=>s+(Number(i.weight)||0),0)
+    + (C.gen||[]).reduce((s,i)=>s+(Number(i.weight)||0)*(Number(i.qty)||1),0)
+    + (C.mi||[]).reduce((s,i)=>s+(Number(i.weight)||0),0);
   const weightPct=Math.min(1,totalWeight/carryMax);
   const weightColor=totalWeight>carryMax?'var(--rl)':totalWeight>carryNormal?'#e8a030':'var(--greenl)';
   const weightLabel=totalWeight>carryMax?'Sovraccaricat*!':totalWeight>carryNormal?'Carico pesante':'OK';
