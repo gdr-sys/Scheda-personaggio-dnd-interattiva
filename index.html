@@ -295,8 +295,11 @@ const DEF={
   showSlotsInCombat:false,
   cn:[],sl:{1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[],9:[]},
   res:[],ins:0,maxIns:1,ds:0,df:0,te:[],
+  concentration:null, // {name, duration} incantesimo in concentrazione
+  resistances:[], immunities:[], vulnerabilities:[],
+  showXpTracker:false, xpTarget:0,
   pt:"",id:"",bo:"",fl:"",app:"",bs:"",nt:"",img:"",
-  coins:{pp:0,gp:0,ep:0,sp:0,cp:0},
+  coins:{pp:0,gp:0,ep:0,sp:0,cp:0,coinsBag:false},
   wea:[],arm:[],mi:[],con_:[],val:[],gen:[],
   ats:3,cs:[],ta:[],npcs:[],locs:[],
   csp:{},
@@ -953,13 +956,44 @@ function pgMain(){
       DIV([LBL('Allineamento'),TI(C.align||'',v=>{C.align=v;save();},'',{fontSize:'12px'})]),
     ],'1fr 1fr 1fr',4),
     ROW([
-      DIV([LBL('XP'),(()=>{const i=mk('input',{type:'text',value:String(C.xp||0),style:{width:'100%'}});i.addEventListener('change',ev=>{C.xp=Number(ev.target.value)||0;save();});return i;})()],{style:{flex:'1'}}),
+      DIV([LBL('XP'),(()=>{
+        const i=mk('input',{type:'text',value:String(C.xp||0),style:{width:'100%'}});
+        i.addEventListener('change',ev=>{C.xp=Number(ev.target.value)||0;save();render();});
+        return i;
+      })()],{style:{flex:'1'}}),
       DIV([LBL('Comp.'),(()=>{const i=mk('input',{type:'text',value:String(C.prof||2),style:{width:'100%'}});i.addEventListener('change',ev=>{C.prof=Number(ev.target.value)||2;save();});return i;})()],{style:{flex:'1'}}),
       DIV([LBL('Vel.'),(()=>{const i=mk('input',{type:'text',value:String(C.spd||30),style:{width:'100%'}});i.addEventListener('change',ev=>{C.spd=Number(ev.target.value)||30;save();});return i;})()],{style:{flex:'1'}}),
       BTN('⚄',showDiceModal,'gold',{padding:'5px 10px'})
     ],{marginTop:'6px',alignItems:'flex-end'})
   ]);
   p.appendChild(hCard);
+
+  // ── Tracker XP (se attivato) ──
+  if(C.showXpTracker){
+    const XP_TABLE=[0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,100000,120000,140000,165000,195000,225000,265000,305000,355000];
+    const currentLv=Math.min(20,C.lv||1);
+    const xpCurrent=C.xp||0;
+    const xpForThisLv=XP_TABLE[currentLv-1]||0;
+    const xpForNextLv=XP_TABLE[currentLv]||XP_TABLE[19];
+    const xpInLevel=xpCurrent-xpForThisLv;
+    const xpNeeded=xpForNextLv-xpForThisLv;
+    const pct=currentLv>=20?1:Math.min(1,Math.max(0,xpInLevel/xpNeeded));
+    const barColor=pct>=1?'var(--gl)':'var(--gold)';
+    const xpCard=CARD([
+      ROW([
+        mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'11px',letterSpacing:'1px'}},['⭐ PROGRESSIONE XP']),
+        currentLv<20?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[xpInLevel+' / '+xpNeeded+' XP (prossimo: '+xpForNextLv+')']):mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'11px'}},['LIVELLO MASSIMO'])
+      ],{justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}),
+      mk('div',{style:{height:'8px',background:'var(--border)',borderRadius:'4px',overflow:'hidden'}},[
+        mk('div',{style:{height:'100%',width:(pct*100).toFixed(1)+'%',background:barColor,borderRadius:'4px',transition:'width 0.4s'}})
+      ]),
+      ROW([
+        mk('span',{style:{color:'var(--tk)',fontSize:'10px'}},['Lv '+currentLv]),
+        currentLv<20?mk('span',{style:{color:'var(--tk)',fontSize:'10px'}},['Lv '+(currentLv+1)]):mk('span',{},['']),
+      ],{justifyContent:'space-between',marginTop:'2px'})
+    ]);
+    p.appendChild(xpCard);
+  }
 
   // Caratteristiche — solo input testo, niente +/-
   const statsGrid=GRID(SK.map(k=>{
@@ -1230,6 +1264,47 @@ function pgCombat(){
   const rp=document.getElementById('rpop');
   function skB(k){const s=C.sk[k];return(S[s.s]||0)+(s.e?pb*2:s.p?pb:0)+(Number((C.skBonus||{})[k])||0);}
 
+  if(!C.concentration)C.concentration=null;
+  if(!C.resistances)C.resistances=[];
+  if(!C.immunities)C.immunities=[];
+  if(!C.vulnerabilities)C.vulnerabilities=[];
+
+  // ── Concentrazione ──
+  const concCard=mk('div',{style:{
+    marginBottom:'8px',
+    border:'1px solid '+(C.concentration?'var(--bluel)':'rgba(90,62,27,0.3)'),
+    borderRadius:'8px',padding:'8px 12px',
+    background:C.concentration?'rgba(26,58,107,0.2)':'var(--card)',
+    display:'flex',alignItems:'center',gap:'8px',
+  }});
+  concCard.appendChild(mk('span',{style:{color:'var(--bluel)',fontSize:'14px',flexShrink:0}},['🔵']));
+  if(C.concentration){
+    const concInfo=mk('div',{style:{flex:'1',minWidth:0}});
+    concInfo.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',letterSpacing:'1px',fontFamily:'var(--ft)'}},[' CONCENTRAZIONE']));
+    concInfo.appendChild(mk('div',{style:{color:'var(--bluel)',fontFamily:'var(--ft)',fontSize:'13px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},[C.concentration.name||'']));
+    if(C.concentration.dur)concInfo.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'10px'}},[C.concentration.dur]));
+    concCard.appendChild(concInfo);
+    concCard.appendChild(BTN('Rompi',()=>{C.concentration=null;save();render();},'ghost sm',{style:{color:'var(--rl)',borderColor:'var(--rl)',flexShrink:0}}));
+  } else {
+    concCard.appendChild(mk('span',{style:{flex:'1',color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)'}},[' Nessuna concentrazione attiva']));
+    // Selettore rapido da incantesimi con Conc.
+    const concSpells=[...(C.cn||[]),...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[]))]
+      .filter(s=>{const d=lkS(s.n);return d?.du&&d.du.includes('Conc');});
+    if(concSpells.length>0){
+      const cSel=mk('select',{style:{fontSize:'11px',background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'4px',padding:'2px 4px',maxWidth:'140px'}});
+      cSel.appendChild(mk('option',{value:''},[' Attiva...']));
+      concSpells.forEach(s=>{const d=lkS(s.n);cSel.appendChild(mk('option',{value:s.n},[d?.it||s.n]));});
+      cSel.addEventListener('change',ev=>{
+        if(!ev.target.value)return;
+        const d=lkS(ev.target.value);
+        C.concentration={name:d?.it||ev.target.value,dur:d?.du||''};
+        save();render();
+      });
+      concCard.appendChild(cSel);
+    }
+  }
+  p.appendChild(concCard);
+
   // ── PF con Danno / Cura ──
   function makePfPanel(){
     const hpCol=C.hp<=0?'var(--rl)':C.hp<(C.maxHp||0)*.5?'#e8a030':'var(--greenl)';
@@ -1394,6 +1469,7 @@ function pgCombat(){
       const nameRow=ROW([
         toggleArr,
         TI(a.n||'',v=>{C[key][i].n=v;save();},'Nome attacco',{flex:'1',fontFamily:'var(--ft)',fontSize:'12px'}),
+        a.mastery?mk('span',{style:{fontSize:'9px',color:'var(--gold)',border:'1px solid var(--gd)',borderRadius:'3px',padding:'0 4px',fontFamily:'monospace',flexShrink:0}},[a.mastery]):mk('span',{},['']),
         BTN('⚄',()=>{ showAttackRoll(a, isM); },'gold sm'),
         BTN('✕',()=>{C[key].splice(i,1);save();render();},'ghost sm')
       ],{marginBottom:isOpen?'4px':'0'});
@@ -1411,6 +1487,7 @@ function pgCombat(){
           DIV([LBL('+ Extra'),(()=>{let t;const n=NI(a.ex||0,v=>{C[key][i].ex=v;save();clearTimeout(t);t=setTimeout(render,700);},undefined,undefined,{width:'100%'});return n;})()]),
           DIV([LBL('Tipo'),TI(a.dt||'',v=>{C[key][i].dt=v;save();},'Perforanti',{})]),
           DIV([LBL('Critico'),TI(a.cd||'',v=>{C[key][i].cd=v;save();},'2d8',{})]),
+          DIV([LBL('Mastery (2024)'),SEL(a.mastery||'',[['','—'],['Cleave','Cleave'],['Graze','Graze'],['Nick','Nick'],['Push','Push'],['Sap','Sap'],['Slow','Slow'],['Topple','Topple'],['Vex','Vex']],v=>{C[key][i].mastery=v;save();},{width:'100%'})]),
         ],'1fr 1fr 1fr',4));
         card.appendChild(ROW([CHK(!!a.pr,v=>{C[key][i].pr=v;save();render();},'Competenza'),TI(a.nt||'',v=>{C[key][i].nt=v;save();},'Note',{flex:'1',fontSize:'11px'})],{marginTop:'4px'}));
       }
@@ -1551,6 +1628,51 @@ function pgCombat(){
     return condCard;
   }
   p.appendChild(buildConditionsCard());
+
+  // ── Resistenze, Immunità, Vulnerabilità ──
+  const DAMAGE_TYPES=['Acido','Freddo','Fuoco','Fulmine','Forza','Necrotici','Radianti','Psichici','Sonoro','Tuono','Veleno','Perforanti','Taglienti','Contundenti','Non magici P/T/C'];
+  function buildResCard(){
+    const card=CARD([]);
+    card.appendChild(LBL('🛡 Resistenze & Immunità'));
+    [
+      {key:'resistances',label:'Resistenze',color:'var(--greenl)',bg:'rgba(42,107,58,0.15)'},
+      {key:'immunities',label:'Immunità',color:'var(--gold)',bg:'rgba(201,168,76,0.1)'},
+      {key:'vulnerabilities',label:'Vulnerabilità',color:'var(--rl)',bg:'rgba(139,32,32,0.15)'},
+    ].forEach(({key,label,color,bg})=>{
+      const section=mk('div',{style:{marginTop:'8px'}});
+      section.appendChild(mk('div',{style:{color:color,fontSize:'10px',fontFamily:'var(--ft)',letterSpacing:'1px',marginBottom:'4px'}},[label.toUpperCase()]));
+      const chips=mk('div',{style:{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'4px'}});
+      (C[key]||[]).forEach((dtype,di)=>{
+        const chip=mk('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'8px',border:'1px solid '+color,color:color,background:bg,display:'inline-flex',alignItems:'center',gap:'4px',cursor:'pointer',userSelect:'none'}});
+        chip.appendChild(mk('span',null,[dtype]));
+        const x=mk('span',{style:{fontSize:'9px',opacity:'0.7'}},['✕']);
+        x.addEventListener('click',()=>{C[key].splice(di,1);save();render();});
+        chip.appendChild(x);
+        chips.appendChild(chip);
+      });
+      // Aggiunta tipo danno
+      const addSel=mk('select',{style:{fontSize:'11px',background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'4px',padding:'2px 4px'}});
+      addSel.appendChild(mk('option',{value:''},['+']));
+      DAMAGE_TYPES.filter(d=>!(C[key]||[]).includes(d)).forEach(d=>{addSel.appendChild(mk('option',{value:d},[d]));});
+      addSel.appendChild(mk('option',{value:'__custom__'},['Personalizzato...']));
+      addSel.addEventListener('change',ev=>{
+        if(!ev.target.value)return;
+        if(ev.target.value==='__custom__'){
+          const v=prompt('Tipo di danno personalizzato:');
+          if(v){if(!C[key])C[key]=[];C[key].push(v);save();render();}
+        } else {
+          if(!C[key])C[key]=[];C[key].push(ev.target.value);save();render();
+        }
+        ev.target.value='';
+      });
+      chips.appendChild(addSel);
+      section.appendChild(chips);
+      card.appendChild(section);
+    });
+    return card;
+  }
+  p.appendChild(buildResCard());
+
   return p;
 }
 
@@ -1738,7 +1860,7 @@ function pgSpells(){
       nm.addEventListener('click',()=>showSpellModal(s.n));
       row.appendChild(nm);
       if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
-      if(d?.du&&d.du.includes('Conc'))row.appendChild(mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},['C']));
+      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
       if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
       // Dado danni/CD se applicabile
       if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
@@ -1769,7 +1891,7 @@ function pgSpells(){
       nm.addEventListener('click',()=>showSpellModal(s.n));
       row.appendChild(nm);
       if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
-      if(d?.du&&d.du.includes('Conc'))row.appendChild(mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},['C']));
+      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
       if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
       // Dado danni/CD
       if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
@@ -1794,10 +1916,38 @@ function pgInventory(){
   const coinsCard=CARD([LBL('Monete'),
     GRID([['pp','#a8a8d8'],['gp','var(--gold)'],['ep','#90a8b0'],['sp','#b8b8b8'],['cp','#c87040']].map(([k,col])=>
       DIV([mk('div',{style:{color:col,fontFamily:'var(--ft)',fontSize:'11px',textAlign:'center'}},[{pp:'MP',gp:'MO',ep:'ME',sp:'MA',cp:'MR'}[k]||k.toUpperCase()]),NI((C.coins||{})[k]||0,v=>{C.coins[k]=v;save();},undefined,undefined,{width:'100%',color:col})])
-    ),'repeat(5,1fr)',4,{marginTop:'6px'})
+    ),'repeat(5,1fr)',4,{marginTop:'6px'}),
+    ROW([
+      CHK(!!(C.coins||{}).coinsBag,v=>{C.coins.coinsBag=v;save();render();},'🎒 Nella Borsa Conservante'),
+    ],{marginTop:'6px'})
   ]);
   p.appendChild(coinsCard);
   p.appendChild(invSearchInp);
+
+  // ── Peso Inventario ──
+  const carryNormal=C.str*5;
+  const carryMax=C.str*10;
+  const totalWeight=[
+    ...(C.wea||[]).reduce((s,i)=>s+(Number(i.weight)||0)*(Number(i.qty)||1),0),
+    ...[0]
+  ].reduce((a,b)=>a+b,0)
+  + (C.arm||[]).reduce((s,i)=>s+(Number(i.weight)||0),0)
+  + (C.gen||[]).reduce((s,i)=>s+(Number(i.weight)||0)*(Number(i.qty)||1),0)
+  + (C.mi||[]).reduce((s,i)=>s+(Number(i.weight)||0),0);
+  const weightPct=Math.min(1,totalWeight/carryMax);
+  const weightColor=totalWeight>carryMax?'var(--rl)':totalWeight>carryNormal?'#e8a030':'var(--greenl)';
+  const weightLabel=totalWeight>carryMax?'Sovraccaricat*!':totalWeight>carryNormal?'Carico pesante':'OK';
+  const weightCard=CARD([
+    ROW([
+      LBL('⚖ Peso Trasportato',{marginBottom:'0'}),
+      mk('span',{style:{color:weightColor,fontFamily:'var(--ft)',fontSize:'13px'}},[totalWeight.toFixed(1)+' / '+carryMax+' kg ('+weightLabel+')'])
+    ],{justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}),
+    mk('div',{style:{height:'6px',background:'var(--border)',borderRadius:'3px',overflow:'hidden'}},[
+      mk('div',{style:{height:'100%',width:(weightPct*100).toFixed(0)+'%',background:weightColor,borderRadius:'3px',transition:'width 0.3s'}})
+    ]),
+    mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginTop:'3px'}},['Normale: '+carryNormal+' kg | Max: '+carryMax+' kg | Basato su FOR '+C.str])
+  ]);
+  p.appendChild(weightCard);
 
   // Sintonizzazione
   const dotsDiv=mk('div',{style:{display:'flex',gap:'3px'}});
@@ -1882,6 +2032,12 @@ function pgInventory(){
 
   // ── Borsa Conservante — raccoglie tutti gli oggetti flaggati ──
   const bagItems=[];
+  // Monete nella borsa
+  if((C.coins||{}).coinsBag){
+    const coinsStr=[['pp','MP'],['gp','MO'],['ep','ME'],['sp','MA'],['cp','MR']]
+      .filter(([k])=>(C.coins[k]||0)>0).map(([k,l])=>C.coins[k]+' '+l).join(', ');
+    if(coinsStr)bagItems.push({name:'Monete: '+coinsStr,src:'💰 Monete',color:'var(--gold)'});
+  }
   // Da oggetti magici
   (C.mi||[]).forEach(item=>{if(item.bagOfHolding)bagItems.push({name:item.name||'(senza nome)',src:'✨ Oggetti Magici',color:'var(--purl)'});});
   // Da sezioni generali
@@ -2629,6 +2785,11 @@ function pgSettings(){
   if(!C.hiddenPages)C.hiddenPages=[];
   const optionalPages=['combo','diario','world','personality'];
   const labels={combo:'⚡ Combo',diario:'📓 Diario',world:'🗺 Mondo',personality:'🎭 Personalità'};
+
+  // ── Tracker XP ──
+  const xpCard=CARD([
+    ROW([LBL('Tracker XP',{marginBottom:'0'}),CHK(!!C.showXpTracker,v=>{C.showXpTracker=v;save();render();},'Attiva tracker livellamento')],{justifyContent:'space-between',alignItems:'center'}),
+  ]);
   const card=CARD([LBL('Pagine Visibili')]);
   const desc=mk('div',{style:{color:'var(--td)',fontSize:'12px',marginBottom:'10px',lineHeight:'1.6'}});
   desc.textContent='Attiva o disattiva le pagine opzionali. Le pagine disattivate non appariranno nella barra di navigazione.';
@@ -2648,6 +2809,7 @@ function pgSettings(){
     row.appendChild(tog);
     card.appendChild(row);
   });
+  p.appendChild(xpCard);
   p.appendChild(card);
   return p;
 }
