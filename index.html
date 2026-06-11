@@ -948,8 +948,9 @@ function pgMain(){
   }
 
   const hCard=CARD([
-    TI(C.name||'',v=>{C.name=v;save();document.getElementById('hn').textContent=v||'Nuovo Personaggio';},'Nome Personaggio',{fontSize:'16px',fontFamily:'var(--ft)',color:'var(--gl)',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',borderRadius:'0',marginBottom:'8px',width:'100%'}),
+    TI(C.name||'',v=>{C.name=v;save();document.getElementById('hn').textContent=v||'Nuovo Personaggio';},'Nome Personaggio',{fontSize:'16px',fontFamily:'var(--ft)',color:'var(--gl)',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',borderRadius:'0',marginBottom:'12px',width:'100%'}),
     classCard,
+    mk('div',{style:{height:'10px'}}),
     GRID([
       DIV([LBL('Razza'),TI(C.race||'',v=>{C.race=v;save();},'',{fontSize:'12px'})]),
       DIV([LBL('Background'),TI(C.bg||'',v=>{C.bg=v;save();},'',{fontSize:'12px'})]),
@@ -1683,8 +1684,20 @@ function pgSpells(){
   const caCls={A:'cbA',AB:'cbAB',R:'cbR'};
   // Stato ricerca incantesimi
   if(!C._spellSearch)C._spellSearch='';
-  const spSearchInp=mk('input',{type:'text',placeholder:'🔍 Cerca incantesimo...',value:C._spellSearch||'',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px'}});
-  spSearchInp.addEventListener('input',ev=>{C._spellSearch=ev.target.value;render();});
+  const spSearchInp=mk('input',{type:'text',id:'spell-search-inp',placeholder:'🔍 Cerca incantesimo...',value:C._spellSearch||'',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px'}});
+  spSearchInp.addEventListener('input',ev=>{
+    C._spellSearch=ev.target.value;
+    // Non chiamare render() — aggiorna solo i risultati
+    clearTimeout(window._spSearchTimer);
+    window._spSearchTimer=setTimeout(()=>{
+      const cur=document.activeElement;
+      const curSel=[cur?.selectionStart,cur?.selectionEnd];
+      render();
+      // Riporta focus e cursore
+      const newInp=document.querySelector('#spell-search-inp');
+      if(newInp){newInp.focus();try{newInp.setSelectionRange(curSel[0],curSel[1]);}catch(e){}}
+    },300);
+  });
   const spQ=(C._spellSearch||'').toLowerCase().trim();
 
   // Incantatore - DC e bonus attacco con modificatori addizionali
@@ -1909,18 +1922,64 @@ function pgInventory(){
   const p=mk('div',{cls:'page'});
   if(!C._invSearch)C._invSearch='';
   const invQ=(C._invSearch||'').toLowerCase().trim();
-  const invSearchInp=mk('input',{type:'text',placeholder:'🔍 Cerca oggetto...',value:C._invSearch||'',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px'}});
-  invSearchInp.addEventListener('input',ev=>{C._invSearch=ev.target.value;render();});
+  const invSearchInp=mk('input',{type:'text',id:'inv-search-inp',placeholder:'🔍 Cerca oggetto...',value:C._invSearch||'',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px'}});
+  invSearchInp.addEventListener('input',ev=>{
+    C._invSearch=ev.target.value;
+    clearTimeout(window._invSearchTimer);
+    window._invSearchTimer=setTimeout(()=>{
+      const pos=[document.activeElement?.selectionStart,document.activeElement?.selectionEnd];
+      render();
+      const newInp=document.querySelector('#inv-search-inp');
+      if(newInp){newInp.focus();try{newInp.setSelectionRange(pos[0],pos[1]);}catch(e){}}
+    },300);
+  });
 
-  // Monete
-  const coinsCard=CARD([LBL('Monete'),
-    GRID([['pp','#a8a8d8'],['gp','var(--gold)'],['ep','#90a8b0'],['sp','#b8b8b8'],['cp','#c87040']].map(([k,col])=>
-      DIV([mk('div',{style:{color:col,fontFamily:'var(--ft)',fontSize:'11px',textAlign:'center'}},[{pp:'MP',gp:'MO',ep:'ME',sp:'MA',cp:'MR'}[k]||k.toUpperCase()]),NI((C.coins||{})[k]||0,v=>{C.coins[k]=v;save();},undefined,undefined,{width:'100%',color:col})])
-    ),'repeat(5,1fr)',4,{marginTop:'6px'}),
-    ROW([
-      CHK(!!(C.coins||{}).coinsBag,v=>{C.coins.coinsBag=v;save();render();},'🎒 Nella Borsa Conservante'),
-    ],{marginTop:'6px'})
-  ]);
+  // Monete — due portafogli separati
+  if(!C.coins)C.coins={pp:0,gp:0,ep:0,sp:0,cp:0};
+  // Migrazione: converti vecchio sistema a nuovo
+  if(C.coins.coinsBag!==undefined){
+    delete C.coins.coinsBag;
+  }
+  ['pp','gp','ep','sp','cp'].forEach(k=>{
+    if(C.coins[k+'Bag']!==undefined&&typeof C.coins[k+'Bag']==='boolean'){
+      // Vecchio sistema: bool → converti in quantità (sposta tutto)
+      if(C.coins[k+'Bag'])C.coins[k+'BagAmt']=C.coins[k]||0;
+      delete C.coins[k+'Bag'];
+    }
+    if(C.coins[k+'BagAmt']===undefined)C.coins[k+'BagAmt']=0;
+  });
+
+  const COIN_LABELS={pp:'MP',gp:'MO',ep:'ME',sp:'MA',cp:'MR'};
+  const COIN_COLORS={pp:'#a8a8d8',gp:'var(--gold)',ep:'#90a8b0',sp:'#b8b8b8',cp:'#c87040'};
+
+  const coinsCard=CARD([]);
+  // Header con due colonne
+  coinsCard.appendChild(ROW([
+    LBL('Monete',{marginBottom:'0'}),
+    mk('div',{style:{display:'flex',gap:'4px',alignItems:'center'}},[ 
+      mk('span',{style:{fontSize:'10px',color:'var(--td)',width:'80px',textAlign:'center'}},['👜 Borsello']),
+      mk('span',{style:{fontSize:'10px',color:'var(--bluel)',width:'80px',textAlign:'center'}},['🎒 Borsa']),
+    ])
+  ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}));
+
+  ['pp','gp','ep','sp','cp'].forEach(k=>{
+    const col=COIN_COLORS[k];
+    const row=mk('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}});
+    // Label
+    row.appendChild(mk('div',{style:{color:col,fontFamily:'var(--ft)',fontSize:'12px',width:'24px',textAlign:'center',flexShrink:0}},[COIN_LABELS[k]]));
+    // Borsello
+    const bInput=mk('input',{type:'number',value:String(C.coins[k]||0),min:'0',style:{flex:'1',textAlign:'center',color:col,fontSize:'13px',background:'rgba(0,0,0,0.1)',border:'1px solid var(--border)',borderRadius:'4px',padding:'3px 4px'}});
+    bInput.addEventListener('change',ev=>{C.coins[k]=Math.max(0,Number(ev.target.value)||0);save();});
+    row.appendChild(bInput);
+    // Separatore
+    row.appendChild(mk('span',{style:{color:'var(--border)',fontSize:'14px',flexShrink:0}},['|']));
+    // Borsa conservante
+    const bgInput=mk('input',{type:'number',value:String(C.coins[k+'BagAmt']||0),min:'0',style:{flex:'1',textAlign:'center',color:'var(--bluel)',fontSize:'13px',background:'rgba(74,122,203,0.08)',border:'1px solid var(--bluel)',borderRadius:'4px',padding:'3px 4px'}});
+    bgInput.addEventListener('change',ev=>{C.coins[k+'BagAmt']=Math.max(0,Number(ev.target.value)||0);save();});
+    row.appendChild(bgInput);
+    coinsCard.appendChild(row);
+  });
+
   p.appendChild(coinsCard);
   p.appendChild(invSearchInp);
 
@@ -2030,12 +2089,12 @@ function pgInventory(){
 
   // ── Borsa Conservante — raccoglie tutti gli oggetti flaggati ──
   const bagItems=[];
-  // Monete nella borsa
-  if((C.coins||{}).coinsBag){
-    const coinsStr=[['pp','MP'],['gp','MO'],['ep','ME'],['sp','MA'],['cp','MR']]
-      .filter(([k])=>(C.coins[k]||0)>0).map(([k,l])=>C.coins[k]+' '+l).join(', ');
-    if(coinsStr)bagItems.push({name:'Monete: '+coinsStr,src:'💰 Monete',color:'var(--gold)'});
-  }
+  // Monete nella borsa — per tipo con quantità separate
+  ['pp','gp','ep','sp','cp'].forEach(k=>{
+    const amt=C.coins?.[k+'BagAmt']||0;
+    const label={pp:'MP',gp:'MO',ep:'ME',sp:'MA',cp:'MR'}[k];
+    if(amt>0)bagItems.push({name:amt+' '+label,src:'💰 Monete',color:'var(--gold)'});
+  });
   // Da oggetti magici
   (C.mi||[]).forEach(item=>{if(item.bagOfHolding)bagItems.push({name:item.name||'(senza nome)',src:'✨ Oggetti Magici',color:'var(--purl)'});});
   // Da sezioni generali
@@ -2279,8 +2338,17 @@ function pgDiario(){
   p.appendChild(hdr);
 
   // Ricerca
-  const noteSearchInp=mk('input',{type:'text',placeholder:'🔍 Cerca nelle note...',value:C._noteSearch||'',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'6px'}});
-  noteSearchInp.addEventListener('input',ev=>{C._noteSearch=ev.target.value;render();});
+  const noteSearchInp=mk('input',{type:'text',id:'note-search-inp',placeholder:'🔍 Cerca nelle note...',value:C._noteSearch||'',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'6px'}});
+  noteSearchInp.addEventListener('input',ev=>{
+    C._noteSearch=ev.target.value;
+    clearTimeout(window._noteSearchTimer);
+    window._noteSearchTimer=setTimeout(()=>{
+      const pos=[document.activeElement?.selectionStart,document.activeElement?.selectionEnd];
+      render();
+      const newInp=document.querySelector('#note-search-inp');
+      if(newInp){newInp.focus();try{newInp.setSelectionRange(pos[0],pos[1]);}catch(e){}}
+    },300);
+  });
   p.appendChild(noteSearchInp);
 
   // Tag chips colorate con gestione
