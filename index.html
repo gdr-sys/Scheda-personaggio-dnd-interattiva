@@ -690,8 +690,11 @@ function showSpellModal(name){
   const db=lkS(name);
   const cu=(C.csp||{})[name?.toLowerCase()]||null;
   const data=cu||db;
-  let editing=!data;
+  // Per incantesimi non SRD: apri direttamente in modalità modifica
+  let editing=!db;
   let dr={...(cu||db||{it:name||'',lv:0,sc:'',ca:'A',ra:'',du:'',co:'',de:''})};
+  // Pre-popola il nome se mancante
+  if(!dr.it&&name)dr.it=name;
 
   function renderSpellModal(){
     const show=editing?dr:(cu||db||{});
@@ -730,7 +733,19 @@ function showSpellModal(name){
           mChkBox(compM,'M',v=>{compM=v;syncComponents();}),
         ],{gap:'16px'})]),
         DIV([LBL('Descrizione'),TA(dr.de||'',v=>{dr.de=v;})]),
-        ROW([BTN('Salva',()=>{if(!C.csp)C.csp={};C.csp[name.toLowerCase()]={...dr};save();closeModal();},'gold'),BTN('Annulla',()=>{editing=false;renderSpellModal();},'')],{gap:'6px',marginTop:'8px'})
+        ROW([BTN('Salva',()=>{
+          if(!C.csp)C.csp={};
+          C.csp[name.toLowerCase()]={...dr};
+          // Aggiorna s.n in tutti gli array degli incantesimi se il nome è cambiato
+          if(dr.it&&dr.it!==name){
+            (C.cn||[]).forEach(s=>{if(s.n===name)s.n=dr.it;});
+            [1,2,3,4,5,6,7,8,9].forEach(l=>{(C.sl[l]||[]).forEach(s=>{if(s.n===name)s.n=dr.it;});});
+            // Sposta la chiave nel csp al nuovo nome
+            C.csp[dr.it.toLowerCase()]={...dr};
+            delete C.csp[name.toLowerCase()];
+          }
+          save();closeModal();render();
+        },'gold'),BTN('Annulla',()=>{editing=false;renderSpellModal();},'')],{gap:'6px',marginTop:'8px'})
       ],{display:'flex',flexDirection:'column',gap:'8px'});
     } else {
       // Try to get from SRD with current edition
@@ -1870,14 +1885,14 @@ function pgSpells(){
       catSel.addEventListener('change',ev=>{C.cn[i].cat=ev.target.value;save();});
       row.appendChild(catSel);
       const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted'}});
-      nm.textContent=d?.it||s.n;
+      nm.textContent=cu?.it||d?.it||s.n;
       nm.addEventListener('click',()=>showSpellModal(s.n));
       row.appendChild(nm);
       if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
-      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
+      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:cu?.it||d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
       if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
       // Dado danni/CD se applicabile
-      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
+      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(cu?.it||d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
       row.appendChild(BTN('✕',()=>{C.cn.splice(i,1);save();render();},'ghost sm'));
       tCard.appendChild(row);
     });
@@ -1901,14 +1916,14 @@ function pgSpells(){
       catSel.addEventListener('change',ev=>{C.sl[l][i].cat=ev.target.value;save();});
       row.appendChild(catSel);
       const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted'}});
-      nm.textContent=d?.it||s.n;
+      nm.textContent=cu?.it||d?.it||s.n;
       nm.addEventListener('click',()=>showSpellModal(s.n));
       row.appendChild(nm);
       if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
-      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
+      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:cu?.it||d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
       if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
       // Dado danni/CD
-      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
+      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(cu?.it||d?.it||s.n,d?.da||null,d?.sv||null),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
       row.appendChild(BTN('✕',()=>{C.sl[l].splice(i,1);save();render();},'ghost sm'));
       lCard.appendChild(row);
     });
