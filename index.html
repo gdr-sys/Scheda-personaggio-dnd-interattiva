@@ -119,6 +119,7 @@ button.sm{font-size:11px;padding:2px 8px}
     <div class="row" style="gap:4px;align-items:center;flex-wrap:wrap">
       <span id="sync-status" style="font-size:10px;display:none"></span>
       <button class="sm ghost" id="theme-btn" onclick="toggleTheme()">☀</button>
+      <button class="sm gold" id="save-btn" onclick="sbForceSave()" title="Salva ora" style="display:none">💾</button>
       <button class="sm ghost" onclick="doExport()">⬇ Export</button>
       <button class="sm ghost" onclick="document.getElementById('ifile').click()">⬆ Import</button>
       <input id="ifile" type="file" accept=".json" style="display:none;width:auto" onchange="doImport(event)"/>
@@ -144,7 +145,7 @@ button.sm{font-size:11px;padding:2px 8px}
 const PAGES=[
   {id:'main',ic:'📜',tx:'Principale'},{id:'skills',ic:'🎯',tx:'Abilità'},
   {id:'combat',ic:'⚔',tx:'Combattimento'},{id:'spells',ic:'✨',tx:'Incantesimi'},
-  {id:'features',ic:'⭐',tx:'Abilità'},
+  {id:'features',ic:'⭐',tx:'Privilegi'},
   {id:'combo',ic:'⚡',tx:'Combo'},{id:'inventory',ic:'🎒',tx:'Inventario'},{id:'personality',ic:'🎭',tx:'Personalità'},
   {id:'diario',ic:'📓',tx:'Diario'},{id:'world',ic:'🗺',tx:'Mondo'},{id:'homebrew',ic:'⚗',tx:'Homebrew'},
   {id:'settings',ic:'⚙',tx:'Impostazioni'},
@@ -2724,8 +2725,8 @@ function pgFeatures(){
     return sec;
   }
 
-  p.appendChild(makeFeatureSection('⭐ Abilità di Classe','var(--gold)',C.classFeatures,'classFeatures'));
-  p.appendChild(makeFeatureSection('🌿 Abilità di Razza','var(--greenl)',C.raceFeatures,'raceFeatures'));
+  p.appendChild(makeFeatureSection('⭐ Privilegi di Classe','var(--gold)',C.classFeatures,'classFeatures'));
+  p.appendChild(makeFeatureSection('🌿 Tratti di Razza','var(--greenl)',C.raceFeatures,'raceFeatures'));
 
   // ── Talenti ──
   const featCard=CARD([]);
@@ -3127,6 +3128,15 @@ async function sbSaveToCloud() {
   }
 }
 
+async function sbForceSave() {
+  if (!sbUser || !sbSchedaId) return;
+  clearTimeout(sbSaveTimer);
+  const btn = document.getElementById('save-btn');
+  if(btn){btn.textContent='💾...';btn.disabled=true;}
+  await sbSaveToCloud();
+  if(btn){btn.textContent='💾';btn.disabled=false;}
+}
+
 // Chiamata da render() ad ogni aggiornamento dati
 function sbOnCharChange() {
   // localStorage già gestito da save() dell'app originale
@@ -3422,6 +3432,8 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (userInfo) userInfo.style.display  = 'flex';
     if (userName) userName.textContent    = sbUser.email.split('@')[0];
     if (syncEl)   syncEl.style.display    = 'inline';
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) saveBtn.style.display = 'inline-block';
 
     // Se la scheda è già aperta (es. TOKEN_REFRESHED), non fare nulla
     if (sbSchedaId) return;
