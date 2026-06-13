@@ -2063,8 +2063,7 @@ function pgInventory(){
       const bcTog=mk('span',{style:{fontSize:'11px',cursor:'pointer',flexShrink:0,color:item.borsa?'var(--bluel)':'var(--tk)',border:'1px solid '+(item.borsa?'var(--bluel)':'var(--border)'),borderRadius:'10px',padding:'1px 6px',whiteSpace:'nowrap',fontFamily:'var(--fb)'}},['🎒 Borsa']);
       bcTog.addEventListener('click',()=>{C[key][i].borsa=!item.borsa;save();render();});
       const hrow=ROW([
-        TI(item.name||'',v=>{C[key][i].name=v;save();},'Nome',{flex:'1',fontSize:'12px'}),
-        fields.includes('qty')&&NI(item.qty||1,v=>{C[key][i].qty=v;save();},undefined,undefined,{width:'42px'}),
+        TI(item.name||'',v=>{C[key][i].name=v;save();},'Nome',{flex:'1',fontSize:'12px'}),        fields.includes('qty')&&NI(item.qty||1,v=>{C[key][i].qty=v;save();},undefined,undefined,{width:'42px'}),
         bcTog,
         BTN(item._exp?'▲':'▼',()=>{C[key][i]._exp=!item._exp;save();render();},'ghost sm'),
         BTN('✕',()=>{C[key].splice(i,1);save();render();},'ghost sm')
@@ -2073,7 +2072,14 @@ function pgInventory(){
       if(item._exp){
         const exp=mk('div',{style:{marginTop:'5px',display:'flex',flexDirection:'column',gap:'4px'}});
         if(fields.includes('weight'))exp.appendChild(DIV([LBL('Peso (kg)'),TI(item.weight||'',v=>{C[key][i].weight=v;save();},'kg',{})]));
-        exp.appendChild(DIV([LBL('Note'),TA(item.desc||'',v=>{C[key][i].desc=v;save();})]));
+        exp.appendChild(DIV([LBL('Note'),(()=>{
+          const ta=TA(item.desc||'',v=>{C[key][i].desc=v;save();},'Note...');
+          ta.addEventListener('input',ev=>{
+            C[key][i].desc=ev.target.value;
+            clearTimeout(ta._t);ta._t=setTimeout(()=>save(),800);
+          });
+          return ta;
+        })()]));
 
         irow.appendChild(exp);
       }
@@ -3130,7 +3136,10 @@ function sbOnCharChange() {
   if(ct&&ct.innerHTML.includes('Caricamento'))return;
   sbUpdateSync('saving');
   clearTimeout(sbSaveTimer);
-  sbSaveTimer = setTimeout(() => sbSaveToCloud(), 1500);
+  // Delay più lungo se l'utente sta scrivendo — evita di interrompere l'input
+  const activeTag=document.activeElement?.tagName;
+  const isTyping=activeTag==='INPUT'||activeTag==='TEXTAREA';
+  sbSaveTimer = setTimeout(() => sbSaveToCloud(), isTyping?4000:1500);
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
