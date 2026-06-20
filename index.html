@@ -257,6 +257,53 @@ const SD={
 "revivify":{it:"Rianimazione",lv:3,sc:"Necromanzia",ca:"A",ra:"Tocco",du:"Istantanea",co:"V,S,M",de:"Riporta in vita una creatura morta da meno di 1 minuto con 1 PF. M: diamante da 300 mo (consumato)."},
 "rianimazione":{it:"Rianimazione",lv:3,sc:"Necromanzia",ca:"A",ra:"Tocco",du:"Istantanea",co:"V,S,M",de:"Riporta in vita da meno di 1 minuto con 1 PF. Richiede diamante 300 mo."},
 };
+// Estrae automaticamente dado danno, scaling e tipo TS da una descrizione,
+// sia in italiano che in inglese — usato per incantesimi custom senza dati salvati
+function autoDetectSpellDice(desc){
+  if(!desc)return{da:null,daHigher:null,sv:null};
+  let da=null,daHigher=null,sv=null;
+
+  // ── DADO BASE (italiano + inglese) ──
+  let m=desc.match(/(\d+d\d+)(?:\s*\+\s*(?:\d+|il modificatore[^,.]*?))?\s+(?:danni|punti ferita)/i);
+  if(!m)m=desc.match(/(\d+d\d+)\s+(?:damage|hit points|hp)/i);
+  if(!m)m=desc.match(/recupera[^.]*?pari a (\d+d\d+)/i);
+  if(!m)m=desc.match(/(?:regains?|recovers?)[^.]*?(\d+d\d+)/i);
+  if(!m)m=desc.match(/subisce (\d+d\d+)/i);
+  if(!m)m=desc.match(/(?:takes?|suffers?)[^.]*?(\d+d\d+)/i);
+  if(m)da=m[1].toLowerCase();
+
+  // ── SCALING ──
+  let higherText=null;
+  let hm=desc.match(/A livelli superiori:(.+?)$/is);
+  if(hm)higherText=hm[1];
+  if(!higherText){
+    hm=desc.match(/At Higher Levels\.?:?(.+?)$/is);
+    if(hm)higherText=hm[1];
+  }
+  if(higherText){
+    let sm2=higherText.match(/aument[ao]no?\s+(?:di\s+)?(\d+d\d+)/i);
+    if(!sm2)sm2=higherText.match(/increases? by (\d+d\d+)/i);
+    if(!sm2)sm2=higherText.match(/\+\s*(\d+d\d+)\s+per/i);
+    if(sm2)daHigher=sm2[1].toLowerCase();
+  }
+
+  // ── TIRO SALVEZZA ──
+  let sm3=desc.match(/tiro salvezza su (Forza|Destrezza|Costituzione|Intelligenza|Saggezza|Carisma)/i);
+  if(sm3){
+    const map={forza:'str',destrezza:'dex',costituzione:'con',intelligenza:'int',saggezza:'wis',carisma:'cha'};
+    sv=map[sm3[1].toLowerCase()];
+  }
+  if(!sv){
+    sm3=desc.match(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) saving throw/i);
+    if(sm3){
+      const map={strength:'str',dexterity:'dex',constitution:'con',intelligence:'int',wisdom:'wis',charisma:'cha'};
+      sv=map[sm3[1].toLowerCase()];
+    }
+  }
+
+  return{da,daHigher,sv};
+}
+
 function lkS(n,edition){
   if(!n)return null;
   const key=n.toLowerCase().trim();
@@ -856,13 +903,16 @@ function showSpellModal(name,viewOnly){
   const data=cu||db;
   // Per incantesimi non SRD: apri direttamente in modalità modifica (a meno che viewOnly)
   let editing=viewOnly?false:!db;
-  let dr={...(cu||db||{it:name||'',lv:0,sc:'',ca:'A',ra:'',du:'',co:'',de:''})};
+  let dr={...(cu||db||{it:name||'',lv:0,sc:'',ca:'A',ra:'',du:'',co:'',cm:'',ta:'',de:''})};
+  // Normalizza lv come numero (può arrivare come stringa da salvataggi precedenti)
+  dr.lv=Number(dr.lv)||0;
   // Pre-popola il nome se mancante
   if(!dr.it&&name)dr.it=name;
 
   function renderSpellModal(){
     const show=editing?dr:(cu||db||{});
-    const title=(show.it||name||'')+(show.lv===0?' (Trucchetto)':show.lv?' (Lv '+show.lv+')':'');
+    const showLv=Number(show.lv)||0;
+    const title=(show.it||name||'')+(showLv===0?' (Trucchetto)':' (Lv '+showLv+')');
     let content;
     if(editing){
       function mChkBox(checked,label,onChange){
@@ -881,21 +931,26 @@ function showSpellModal(name,viewOnly){
         if(v){if(!(dr.du||'').includes('Conc'))dr.du='Conc. 1 min';}
         else{dr.du=(dr.du||'').replace(/Conc\.\s*/,'').trim()||'Istantanea';}
       });
+      const matFieldWrap=mk('div',{style:{display:compM?'block':'none',marginTop:'4px'}});
+      matFieldWrap.appendChild(TI(dr.cm||'',v=>{dr.cm=v;},'Cosa serve come componente materiale...'));
       content=DIV([
         DIV([LBL('Nome'),TI(dr.it||'',v=>{dr.it=v;})]),
         GRID([
-          DIV([LBL('Livello'),SEL(String(dr.lv??0),[['0','Trucchetto'],['1','1°'],['2','2°'],['3','3°'],['4','4°'],['5','5°'],['6','6°'],['7','7°'],['8','8°'],['9','9°']],v=>{dr.lv=Number(v);},{width:'100%'})]),
+          DIV([LBL('Livello'),SEL(String(dr.lv),[['0','Trucchetto'],['1','1°'],['2','2°'],['3','3°'],['4','4°'],['5','5°'],['6','6°'],['7','7°'],['8','8°'],['9','9°']],v=>{dr.lv=Number(v);},{width:'100%'})]),
           DIV([LBL('Scuola'),SEL(dr.sc||'',[['','—'],['Abiurazione','Abiurazione'],['Ammaliamento','Ammaliamento'],['Divinazione','Divinazione'],['Evocazione','Evocazione'],['Illusione','Illusione'],['Incantamento','Incantamento'],['Invocazione','Invocazione'],['Necromanzia','Necromanzia'],['Trasmutazione','Trasmutazione']],v=>{dr.sc=v;},{width:'100%'})]),
         ],'1fr 1fr',6),
         DIV([LBL('Tipo Azione'),SEL(dr.ca||'A',[['A','Azione'],['AB','Azione Bonus'],['R','Reazione'],['special','Speciale']],v=>{dr.ca=v;},{width:'100%'})]),
         concChk,
-        DIV([LBL('Durata'),TI(dr.du||'',v=>{dr.du=v;})]),
-        DIV([LBL('Gittata'),TI(dr.ra||'',v=>{dr.ra=v;})]),
+        GRID([
+          DIV([LBL('Durata'),TI(dr.du||'',v=>{dr.du=v;})]),
+          DIV([LBL('Gittata'),TI(dr.ra||'',v=>{dr.ra=v;})]),
+        ],'1fr 1fr',6),
+        DIV([LBL('Bersaglio'),TI(dr.ta||'',v=>{dr.ta=v;},'Es. una creatura, voi stessi, un punto entro gittata...')]),
         DIV([LBL('Componenti'),ROW([
           mChkBox(compV,'V',v=>{compV=v;syncComponents();}),
           mChkBox(compS,'S',v=>{compS=v;syncComponents();}),
-          mChkBox(compM,'M',v=>{compM=v;syncComponents();}),
-        ],{gap:'16px'})]),
+          mChkBox(compM,'M',v=>{compM=v;syncComponents();matFieldWrap.style.display=v?'block':'none';}),
+        ],{gap:'16px'}),matFieldWrap]),
         DIV([LBL('Descrizione'),TA(dr.de||'',v=>{dr.de=v;})]),
         ROW([BTN('Salva',()=>{
           if(!C.csp)C.csp={};
@@ -922,7 +977,13 @@ function showSpellModal(name,viewOnly){
       const badgeRow=mk('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'10px'}});
       if(show2.ca)badgeRow.appendChild(mk('span',{cls:caCls[show2.ca]||'cbA'},[caMap[show2.ca]||show2.ca]));
       if(isConc2)badgeRow.appendChild(mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 5px',fontSize:'10px',fontFamily:'monospace'}},['C Concentrazione']));
-      if(show2.co){show2.co.split(',').map(c=>c.trim().replace(/\s*\(.*\)/,'')).filter(Boolean).forEach(c=>{badgeRow.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 5px',fontSize:'10px',fontFamily:'monospace'}},[c]));});}
+      if(show2.co){
+        show2.co.split(',').map(c=>c.trim().replace(/\s*\(.*\)/,'')).filter(Boolean).forEach(c=>{
+          const compBadge=mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 5px',fontSize:'10px',fontFamily:'monospace'}},[c]);
+          if(c==='M'&&show2.cm)compBadge.title=show2.cm;
+          badgeRow.appendChild(compBadge);
+        });
+      }
       // Edition switcher if spell is in SRD
       const srdOther=lkS(name,C.spellEdition==='2024'?'2014':'2024');
       const edRow=srdOther?ROW([
@@ -936,8 +997,10 @@ function showSpellModal(name,viewOnly){
           show2.sc&&DIV([LBL('Scuola'),mk('div',{style:{color:'var(--text)',fontSize:'13px'}},[show2.sc])]),
           show2.ra&&DIV([LBL('Gittata'),mk('div',{style:{color:'var(--text)',fontSize:'13px'}},[show2.ra])]),
           show2.du&&DIV([LBL('Durata'),mk('div',{style:{color:'var(--text)',fontSize:'13px'}},[show2.du])]),
+          show2.ta&&DIV([LBL('Bersaglio'),mk('div',{style:{color:'var(--text)',fontSize:'13px'}},[show2.ta])]),
           show2.rituale&&DIV([mk('span',{style:{color:'var(--gold)',fontSize:'11px'}},['✦ Rituale'])]),
         ].filter(Boolean),'1fr 1fr',6,{marginBottom:'10px'}),
+        show2.cm&&DIV([LBL('Componente Materiale'),mk('div',{style:{color:'var(--td)',fontSize:'12px',fontStyle:'italic'}},[show2.cm])]),
         mk('div',{style:{color:'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',lineHeight:'1.7',whiteSpace:'pre-wrap'}},[show2.de||'Nessuna descrizione.']),
         BTN('✏ Modifica manuale',()=>{dr={...show2};editing=true;renderSpellModal();},'sm ghost',{marginTop:'10px'})
       ].filter(Boolean),{display:'flex',flexDirection:'column',gap:'6px'});
@@ -1710,7 +1773,7 @@ function pgCombat(){
       ]));
     } else {
       allSpells.forEach(s=>{
-        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const info=cu||d||{};
+        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let info=cu||d||{};if(cu&&!info.da&&!info.sv&&info.de){const auto=autoDetectSpellDice(info.de);info={...info,da:info.da||auto.da,daHigher:info.daHigher||auto.daHigher,sv:info.sv||auto.sv};}
         const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--gd)'}});
         const topRow=ROW([
           mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
@@ -1744,7 +1807,7 @@ function pgCombat(){
       ]));
     } else {
       buffSpells.forEach(s=>{
-        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const info=cu||d||{};
+        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let info=cu||d||{};if(cu&&!info.da&&!info.sv&&info.de){const auto=autoDetectSpellDice(info.de);info={...info,da:info.da||auto.da,daHigher:info.daHigher||auto.daHigher,sv:info.sv||auto.sv};}
         const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--purl)'}});
         row.appendChild(ROW([
           mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
@@ -1777,7 +1840,7 @@ function pgCombat(){
       ]));
     } else {
       healSpells.forEach(s=>{
-        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const info=cu||d||{};
+        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let info=cu||d||{};if(cu&&!info.da&&!info.sv&&info.de){const auto=autoDetectSpellDice(info.de);info={...info,da:info.da||auto.da,daHigher:info.daHigher||auto.daHigher,sv:info.sv||auto.sv};}
         const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--green)'}});
         row.appendChild(ROW([
           mk('span',{style:{color:'var(--greenl)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
@@ -2076,7 +2139,7 @@ function pgSpells(){
     const tCard=CARD([LBL('Trucchetti')]);
     filteredCn.forEach((s)=>{
       const i=(C.cn||[]).indexOf(s);
-      const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const d=cu||db;
+      const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let d=cu||db;if(cu&&!d.da&&!d.sv&&d.de){const auto=autoDetectSpellDice(d.de);d={...d,da:d.da||auto.da,daHigher:d.daHigher||auto.daHigher,sv:d.sv||auto.sv};}
       const row=mk('div',{cls:'srow'});
       // Categoria per Combat (trucchetti sempre visibili, basta la categoria)
       const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'68px'}});
@@ -2105,7 +2168,7 @@ function pgSpells(){
     const lCard=CARD([LBL('Livello '+l)]);
     list.forEach((s)=>{
       const i=(C.sl[l]||[]).indexOf(s);
-      const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const d=cu||db;
+      const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let d=cu||db;if(cu&&!d.da&&!d.sv&&d.de){const auto=autoDetectSpellDice(d.de);d={...d,da:d.da||auto.da,daHigher:d.daHigher||auto.daHigher,sv:d.sv||auto.sv};}
       const row=mk('div',{cls:'srow'});
       const chkEl=CHK(!!s.pr,v=>{C.sl[l][i].pr=v;save();render();});
       row.appendChild(chkEl);
@@ -3070,8 +3133,8 @@ function pgFeatures(){
 function pgSettings(){
   const p=mk('div',{cls:'page'});
   if(!C.hiddenPages)C.hiddenPages=[];
-  const optionalPages=['combo','diario','world','personality'];
-  const labels={combo:'⚡ Combo',diario:'📓 Diario',world:'🗺 Mondo',personality:'🎭 Personalità'};
+  const optionalPages=['spells','combo','diario','world','personality','homebrew'];
+  const labels={spells:'✨ Incantesimi',combo:'⚡ Combo',diario:'📓 Diario',world:'🗺 Mondo',personality:'🎭 Personalità',homebrew:'⚗ Homebrew'};
 
   // ── Account ──
   const isLogged=typeof sbUser!=='undefined'&&sbUser;
