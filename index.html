@@ -1515,7 +1515,7 @@ function pgCombat(){
   }
   p.appendChild(atkSection(C.wa,'wa','⚔ Attacchi con Armi',false));
 
-  // ── Attacchi Magici (da incantesimi flaggati "Attacco") ──
+  // ── Incantesimi di Attacco (da incantesimi flaggati "Attacco") ──
   const div1=mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}});
   p.appendChild(div1);
   (()=>{
@@ -1524,22 +1524,34 @@ function pgCombat(){
       ...(C.cn||[]).filter(s=>s.cat==='attack'),
       ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='attack')
     ];
-    // Sincronizza C.ma automaticamente con incantesimi flaggati attacco
-    const spellKeys=new Set(allSpells.map(s=>s.n.toLowerCase()));
-    C.ma=(C.ma||[]).filter(a=>!a.fromSpell||spellKeys.has((a.fromSpell||'').toLowerCase()));
-    const maKeys=new Set((C.ma||[]).filter(a=>a.fromSpell).map(a=>a.fromSpell.toLowerCase()));
-    allSpells.forEach(s=>{
-      const key=s.n.toLowerCase();
-      if(!maKeys.has(key)){
-        const d=lkS(s.n);const cu=(C.csp||{})[key]||null;const info=cu||d;
-        C.ma.push({n:(info?.it||s.n),stat:C.sca||'int',dmgStat:'none',pr:true,dmg:'',dt:'',ex:0,cd:'',nt:'',range:info?.ra||'',fromSpell:s.n});
-      }
-    });
-    const maSec=atkSection(C.ma,'ma','⚡ Attacchi Magici',true);
-    p.appendChild(maSec);
+    const sec=mk('div');
+    sec.appendChild(ROW([LBL('⚡ Incantesimi di Attacco',{color:'var(--gold)'})],{marginBottom:'4px'}));
+    if(allSpells.length===0){
+      sec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)',padding:'4px 0'}},[
+        'Nessun incantesimo di attacco preparato. Segna la categoria su un incantesimo nella pagina ✨.'
+      ]));
+    } else {
+      allSpells.forEach(s=>{
+        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const info=cu||d||{};
+        const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--gd)'}});
+        const topRow=ROW([
+          mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
+          info.lv!==undefined?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[info.lv===0?'Trucchetto':'Lv '+info.lv]):mk('span',{},['']),
+        ]);
+        row.appendChild(topRow);
+        if(info.da||info.sv){
+          const diceBtn=BTN('⚄ Tira',(ev)=>{ev.stopPropagation();showSpellRollPopup(info.it||s.n,info.da||null,info.sv||null);},'gold sm',{style:{marginTop:'6px',padding:'2px 10px',fontSize:'11px'}});
+          row.appendChild(diceBtn);
+        }
+        if(info.du)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginTop:'4px'}},['Durata: '+info.du]));
+        row.addEventListener('click',()=>showSpellModal(s.n,true));
+        sec.appendChild(row);
+      });
+    }
+    p.appendChild(sec);
   })();
 
-  // ── Buff & Debuff (da incantesimi flaggati "Buff/Debuff") ──
+  // ── Incantesimi di Buff e Debuff (da incantesimi flaggati "Buff/Debuff") ──
   p.appendChild(mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}}));
   (()=>{
     const buffSpells=[
@@ -1547,7 +1559,7 @@ function pgCombat(){
       ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='buff')
     ];
     const sec=mk('div');
-    sec.appendChild(ROW([LBL('🔮 Buff & Debuff',{color:'var(--purl)'})],{marginBottom:'4px'}));
+    sec.appendChild(ROW([LBL('🔮 Incantesimi di Buff e Debuff',{color:'var(--purl)'})],{marginBottom:'4px'}));
     if(buffSpells.length===0){
       sec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)',padding:'4px 0'}},[
         'Nessun incantesimo Buff/Debuff preparato. Segna la categoria su un incantesimo nella pagina ✨.'
