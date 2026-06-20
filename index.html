@@ -28,8 +28,8 @@ body.light{
 body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hidden}
 *{box-sizing:border-box}
 input,textarea,select{background:rgba(0,0,0,0.07);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--fb);font-size:14px;padding:4px 8px;outline:none;width:100%}body.light input,body.light textarea,body.light select{background:rgba(255,255,255,0.7)}
-input[type=number]{width:58px;text-align:center;padding:4px 6px}@media(min-width:500px){input[type=number]{width:72px;padding:4px 8px}}
-input[type=number]::-webkit-inner-spin-button{opacity:1}
+input[type=number]{width:58px;text-align:center;padding:4px 2px 4px 6px}@media(min-width:500px){input[type=number]{width:72px;padding:4px 4px 4px 8px}}
+input[type=number]::-webkit-inner-spin-button{opacity:1;margin-left:4px}
 textarea{resize:vertical;min-height:60px;font-family:var(--fb)}
 select option{background:var(--card)}
 button{background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--fb);font-size:13px;padding:5px 12px;cursor:pointer;flex-shrink:0}body.light .irow,body.light .srow,body.light .mgrow{background:rgba(255,255,255,0.4)}
@@ -43,13 +43,18 @@ button.sm{font-size:11px;padding:2px 8px}
 .row{display:flex;align-items:center;gap:6px}
 .page{padding:12px;display:flex;flex-direction:column;gap:10px}
 #hdr{background:linear-gradient(180deg,var(--paper) 0%,rgba(26,22,16,0.97) 100%);border-bottom:1px solid var(--border);padding:8px 12px;position:sticky;top:0;z-index:100}
-#nav{position:fixed;bottom:0;left:0;right:0;background:rgba(26,22,16,0.95);backdrop-filter:blur(8px);border-top:1px solid var(--border);z-index:100;overflow-x:auto;-webkit-overflow-scrolling:touch}
+#nav{position:fixed;bottom:0;left:0;right:0;background:var(--paper);backdrop-filter:blur(8px);border-top:1px solid var(--border);z-index:100;overflow-x:auto;-webkit-overflow-scrolling:touch}
+body.light #nav{background:rgba(232,224,208,0.97)}
+body:not(.light) #nav{background:rgba(26,22,16,0.95)}
 #nav-inner{display:flex;min-width:max-content;padding:4px 8px;gap:2px}
 .nb{background:transparent;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 10px;border-radius:6px;flex-shrink:0}
 .nb.on{background:rgba(201,168,76,0.15)}
 .nb .ic{font-size:18px}
-.nb .tx{font-size:8px;font-family:var(--ft);letter-spacing:.5px;white-space:nowrap;color:var(--tk)}
+.nb .tx{font-size:9px;font-family:var(--ft);letter-spacing:.5px;white-space:nowrap;color:var(--tk)}
 .nb.on .tx{color:var(--gl)}
+body.light .nb .ic{filter:drop-shadow(0 0 0.5px rgba(0,0,0,0.4))}
+body.light .nb .tx{color:#4a3818;font-weight:600}
+body.light .nb.on .tx{color:var(--gl)}
 #content{padding-bottom:80px;max-width:600px;margin:0 auto}
 .sl{position:fixed;top:0;left:0;width:3px;height:100vh;background:linear-gradient(180deg,transparent,var(--gd),transparent);pointer-events:none;z-index:50}
 .sr{position:fixed;top:0;right:0;width:3px;height:100vh;background:linear-gradient(180deg,transparent,var(--gd),transparent);pointer-events:none;z-index:50}
@@ -136,7 +141,7 @@ button.sm{font-size:11px;padding:2px 8px}
   </div>
   <div id="hp" style="color:var(--gold);font-family:var(--ft);font-size:10px;letter-spacing:2px;text-align:center;margin-top:2px"></div>
 </div>
-<div id="action-tracker" style="display:none;padding:5px 10px;background:var(--paper);border-bottom:1px solid var(--border);align-items:center;gap:6px;justify-content:center;flex-wrap:nowrap"></div>
+<div id="action-tracker" style="display:none;padding:5px 10px;background:var(--paper);border-bottom:1px solid var(--border);align-items:center;gap:6px;justify-content:center;flex-wrap:nowrap;position:sticky;z-index:99"></div>
 <div id="content"></div>
 <div id="nav"><div id="nav-inner"></div></div>
 <div id="modal-root"></div>
@@ -583,7 +588,7 @@ function TA(val,cb,ph,st){
 }
 function NI(val,cb,mn,mx,st){
   // Number input - NO render
-  const el=mk('input',{type:'number',value:val??0,style:{width:'58px',textAlign:'center',...(st||{})}});
+  const el=mk('input',{type:'number',value:val??0,style:{width:'58px',textAlign:'center',paddingRight:'4px',boxSizing:'border-box',...(st||{})}});
   if(mn!=null)el.min=mn;
   if(mx!=null)el.max=mx;
   el.addEventListener('input',ev=>cb(Number(ev.target.value)));
@@ -1254,7 +1259,7 @@ function pgMain(){
         BTN('▼',()=>{C.res[i].cur=Math.max(0,(r.cur||0)-1);save();render();},'ghost sm'),
         mk('span',{style:{color:'var(--text)',fontFamily:'var(--ft)',fontSize:'14px',minWidth:'16px',textAlign:'center'}},[String(r.cur||0)]),
         mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['/']),
-        NI(r.max||1,v=>{C.res[i].max=v;save();},undefined,undefined,{width:'36px'}),
+        NI(r.max||1,v=>{C.res[i].max=v;save();},undefined,undefined,{width:'48px'}),
         BTN('▲',()=>{C.res[i].cur=Math.min(r.max||1,(r.cur||0)+1);save();render();},'ghost sm'),
         BTN('✕',()=>{C.res.splice(i,1);save();render();},'ghost sm')
       ]),
@@ -1290,31 +1295,36 @@ function pgSkills(){
 
   // Tiri salvezza con modificatore
   const svCard=CARD([LBL('Tiri Salvezza'),
-    GRID(['str','dex','con','int','wis','cha'].map(s=>ROW([
-      CHK(!!(C.sp||{})[s],v=>{C.sp[s]=v;save();render();}),
-      mk('span',{style:{color:'var(--td)',fontFamily:'var(--fb)',fontSize:'12px',flex:'1'}},[SL[s]]),
-      NI((C.spBonus||{})[s]||0,v=>{if(!C.spBonus)C.spBonus={};C.spBonus[s]=v;save();render();},undefined,undefined,{width:'38px',fontSize:'11px',textAlign:'center',padding:'2px',color:'var(--bluel)'}),
-      mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px',minWidth:'26px',textAlign:'right'}},[fm(S[s]+((C.sp||{})[s]?pb:0)+((C.spBonus||{})[s]||0))])
-    ])),'1fr 1fr',4,{marginTop:'6px'})
+    GRID(['str','dex','con','int','wis','cha'].map(s=>{
+      const total=S[s]+((C.sp||{})[s]?pb:0)+((C.spBonus||{})[s]||0);
+      return ROW([
+        CHK(!!(C.sp||{})[s],v=>{C.sp[s]=v;save();render();}),
+        mk('span',{style:{color:'var(--td)',fontFamily:'var(--fb)',fontSize:'12px',flex:'1'}},[SL[s]]),
+        NI((C.spBonus||{})[s]||0,v=>{if(!C.spBonus)C.spBonus={};C.spBonus[s]=v;save();render();},undefined,undefined,{width:'42px',fontSize:'11px',textAlign:'center',padding:'3px 2px',color:'var(--bluel)'}),
+        (()=>{const btn=BTN(fm(total),()=>showRoll('1d20'+fm(total),'TS '+SL[s]),'gold sm',{style:{minWidth:'42px',padding:'3px 6px',fontFamily:'var(--ft)',fontSize:'13px'}});return btn;})()
+      ]);
+    }),'1fr 1fr',4,{marginTop:'6px'})
   ]);
   p.appendChild(svCard);
 
   // Abilità con modificatore manuale
   const skList=mk('div',{style:{marginTop:'6px'}});
   Object.entries(C.sk||{}).sort(([a],[b])=>a.localeCompare(b,'it')).forEach(([name,s])=>{
-    const row=mk('div',{style:{display:'flex',alignItems:'center',gap:'4px',padding:'3px 0',borderBottom:'1px solid rgba(90,62,27,.2)'}});
+    const row=mk('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'4px 0',borderBottom:'1px solid rgba(90,62,27,.2)'}});
     row.appendChild(CHK(!!s.p,v=>{C.sk[name].p=v;save();render();}));
     row.appendChild(CHK(!!s.e,v=>{C.sk[name].e=v;save();render();}));
     const nm=mk('span',{style:{color:s.e?'var(--gl)':s.p?'var(--text)':'var(--td)',fontFamily:'var(--fb)',fontSize:'13px',flex:'1',textTransform:'capitalize'}});
     nm.textContent=name+' ('+SL[s.s]+')';
     row.appendChild(nm);
     // Modificatore manuale abilità
-    const bonI=NI((C.skBonus||{})[name]||0,v=>{if(!C.skBonus)C.skBonus={};C.skBonus[name]=v;save();render();},undefined,undefined,{width:'38px',fontSize:'11px',textAlign:'center',padding:'2px',color:'var(--bluel)'});
+    const bonI=NI((C.skBonus||{})[name]||0,v=>{if(!C.skBonus)C.skBonus={};C.skBonus[name]=v;save();render();},undefined,undefined,{width:'42px',fontSize:'11px',textAlign:'center',padding:'3px 2px',color:'var(--bluel)'});
     row.appendChild(bonI);
-    row.appendChild(mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px',minWidth:'26px',textAlign:'right'}},[fm(skB(name))]));
+    const total=skB(name);
+    const rollBtn=BTN(fm(total),()=>showRoll('1d20'+fm(total),name.charAt(0).toUpperCase()+name.slice(1)),'gold sm',{style:{minWidth:'42px',padding:'3px 6px',fontFamily:'var(--ft)',fontSize:'13px'}});
+    row.appendChild(rollBtn);
     skList.appendChild(row);
   });
-  p.appendChild(CARD([LBL('Abilità (1°✦=competenza, 2°✦=maestria  |  campo blu=modificatore)'),skList]));
+  p.appendChild(CARD([LBL('Abilità (1°✦=competenza, 2°✦=maestria  |  campo blu=modificatore  |  clicca il totale per tirare)'),skList]));
 
   // Competenze
   p.appendChild(CARD([LBL('Lingue & Competenze'),
@@ -1616,13 +1626,17 @@ function pgCombat(){
       ]));
     } else {
       buffSpells.forEach(s=>{
-        const d=lkS(s.n);const info=d||{};
+        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const info=cu||d||{};
         const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--purl)'}});
         row.appendChild(ROW([
           mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
-          info.lv?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['Lv '+info.lv]):mk('span',{},['']),
+          info.lv!==undefined?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[info.lv===0?'Trucchetto':'Lv '+info.lv]):mk('span',{},['']),
         ]));
-        if(info.du)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginTop:'2px'}},['Durata: '+info.du]));
+        if(info.da||info.sv){
+          const diceBtn=BTN('⚄ Tira',(ev)=>{ev.stopPropagation();showSpellRollPopup(info.it||s.n,info.da||null,info.sv||null);},'gold sm',{style:{marginTop:'6px',padding:'2px 10px',fontSize:'11px'}});
+          row.appendChild(diceBtn);
+        }
+        if(info.du)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginTop:'4px'}},['Durata: '+info.du]));
         row.addEventListener('click',()=>showSpellModal(s.n,true));
         sec.appendChild(row);
       });
@@ -1645,13 +1659,17 @@ function pgCombat(){
       ]));
     } else {
       healSpells.forEach(s=>{
-        const d=lkS(s.n);const info=d||{};
+        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;const info=cu||d||{};
         const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--green)'}});
         row.appendChild(ROW([
           mk('span',{style:{color:'var(--greenl)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
-          info.lv?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['Lv '+info.lv]):mk('span',{},['']),
+          info.lv!==undefined?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[info.lv===0?'Trucchetto':'Lv '+info.lv]):mk('span',{},['']),
         ]));
-        if(info.du)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginTop:'2px'}},['Durata: '+info.du]));
+        if(info.da||info.sv){
+          const diceBtn=BTN('⚄ Tira',(ev)=>{ev.stopPropagation();showSpellRollPopup(info.it||s.n,info.da||null,info.sv||null);},'gold sm',{style:{marginTop:'6px',padding:'2px 10px',fontSize:'11px'}});
+          row.appendChild(diceBtn);
+        }
+        if(info.du)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginTop:'4px'}},['Durata: '+info.du]));
         row.addEventListener('click',()=>showSpellModal(s.n,true));
         sec.appendChild(row);
       });
@@ -2407,7 +2425,7 @@ function pgDiario(){
   if(!C.noteTags)C.noteTags=[
     {name:'Sessione',color:'#4a7acb'},
     {name:'Lore',color:'#8a50c0'},
-    {name:'Todo',color:'#e8a030'},
+    {name:'To Do',color:'#e8a030'},
     {name:'Altro',color:'#6a8060'},
   ];
   const tagColorMap=Object.fromEntries((C.noteTags||[]).map(t=>[t.name,t.color]));
@@ -3076,6 +3094,9 @@ function updateHdr(){
   if(PG==='combat'){
     if(!C.turnActions)C.turnActions={a:false,ab:false,r:false,m:false};
     actBar.style.display='flex';
+    // Posiziona subito sotto l'header, qualunque sia la sua altezza reale
+    const hdrEl2=document.getElementById('hdr');
+    if(hdrEl2)actBar.style.top=hdrEl2.offsetHeight+'px';
     actBar.innerHTML='';
     const ACTS=[['a','A'],['ab','AB'],['r','R'],['m','M']];
     const LABELS={a:'Azione',ab:'Azione Bonus',r:'Reazione',m:'Movimento'};
