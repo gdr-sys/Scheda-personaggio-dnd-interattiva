@@ -2887,7 +2887,7 @@ function pgSettings(){
       BTN('💾 Salva Ora',()=>{if(typeof sbForceSave==='function')sbForceSave();},'gold sm',{style:{flex:'1'}}),
       BTN('⚔ Le Mie Schede',()=>{if(typeof sbSwitchScheda==='function')sbSwitchScheda();},'sm',{style:{flex:'1'}}),
     ],{gap:'6px',marginBottom:'6px'}));
-    accountCard.appendChild(BTN('🚪 Esci dall\\'Account',()=>{if(typeof sbSignOut==='function')sbSignOut();},'ghost sm',{style:{width:'100%',color:'var(--rl)',borderColor:'var(--red)'}}));
+    accountCard.appendChild(BTN('🚪 Esci dall\'Account',()=>{if(typeof sbSignOut==='function')sbSignOut();},'ghost sm',{style:{width:'100%',color:'var(--rl)',borderColor:'var(--red)'}}));
   } else {
     accountCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',marginBottom:'8px'}},['Non sei collegato a un account cloud.']));
     accountCard.appendChild(BTN('☁ Accedi con Google',()=>{if(typeof sbSignIn==='function')sbSignIn();},'gold sm',{style:{width:'100%'}}));
