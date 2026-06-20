@@ -3294,7 +3294,15 @@ function sbShowCharSelect(schede) {
 // ╚══════════════════════════════════════════════════════════════╝
 async function sbOpenScheda(schedaId) {
   const ct = document.getElementById('content');
-  ct.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--td);font-family:var(--ft);font-size:13px;letter-spacing:1px">⟳ Caricamento...</div>`;
+  ct.innerHTML = `<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--td);font-family:var(--ft);font-size:13px;letter-spacing:1px">
+    <div>⟳ Caricamento...</div>
+    <button onclick="window._emergencyExit()" style="background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--td);font-size:11px;padding:6px 14px;cursor:pointer;font-family:var(--fb);letter-spacing:0">Bloccato? Clicca qui</button>
+  </div>`;
+  window._emergencyExit = ()=>{
+    localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
+    sbSchedaId=null;
+    sbLoadSchedeList();
+  };
 
   // Timeout di sicurezza — se dopo 10 secondi non risponde, va alla lista
   const timeout = setTimeout(() => {
@@ -3418,16 +3426,36 @@ async function sbLoadSchedeList() {
   sbSchedaId = null;
   document.getElementById('nav').style.display = 'none';
   document.getElementById('content').innerHTML = `
-    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--td);font-family:var(--ft);font-size:13px;letter-spacing:1px">
-      ⟳ Caricamento schede...
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--td);font-family:var(--ft);font-size:13px;letter-spacing:1px">
+      <div>⟳ Caricamento schede...</div>
+      <button onclick="window._emergencySignOut()" style="background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--td);font-size:11px;padding:6px 14px;cursor:pointer;font-family:var(--fb);letter-spacing:0">Bloccato? Esci e riprova</button>
     </div>`;
+  window._emergencySignOut = async ()=>{
+    try{await sb.auth.signOut();}catch(e){}
+    location.reload();
+  };
 
-  const { data, error } = await sb.from('schede')
-    .select('*')
-    .eq('user_id', sbUser.id)
-    .order('updated_at', { ascending: false });
+  let data, error;
+  try {
+    const res = await sb.from('schede')
+      .select('*')
+      .eq('user_id', sbUser.id)
+      .order('updated_at', { ascending: false });
+    data = res.data; error = res.error;
+  } catch(e) {
+    error = e;
+  }
 
-  if (error) { alert('Errore nel caricare le schede: ' + error.message); return; }
+  if (error) {
+    document.getElementById('content').innerHTML = '';
+    const errDiv=mk('div',{style:{minHeight:'80vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',padding:'24px',textAlign:'center'}});
+    errDiv.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'13px'}},['⚠ Errore nel caricare le schede']));
+    errDiv.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'12px',maxWidth:'260px'}},[error.message||'Errore sconosciuto']));
+    const retryBtn=BTN('Riprova',()=>sbLoadSchedeList(),'gold');
+    errDiv.appendChild(retryBtn);
+    document.getElementById('content').appendChild(errDiv);
+    return;
+  }
   sbShowCharSelect(data || []);
 }
 
