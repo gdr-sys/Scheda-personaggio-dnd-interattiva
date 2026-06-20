@@ -520,9 +520,38 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
   const spCD=8+pb+scaMod;
 
   // Se non c'è scaling, tira direttamente senza chiedere il livello
+  // (e se è un incantesimo livellato, consuma comunque lo slot base se disponibile)
   if(!daHigher || !dmgDice){
-    renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod);
+    let consumed=null;
+    if(!isCantrip && baseLv>0){
+      const wasAvail=(C.ss[baseLv]?.m||0)-(C.ss[baseLv]?.u||0);
+      if(wasAvail>0){consumeSlotIfAvailable(baseLv);consumed=baseLv;}
+    }
+    renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, consumed);
     return;
+  }
+
+  // Per incantesimi livellati: trova quali slot sono disponibili dal livello base in su
+  let availableLevels=[];
+  if(!isCantrip){
+    const minLv=baseLv||1;
+    for(let l=minLv;l<=9;l++){
+      const s=C.ss[l]||{m:0,u:0};
+      const avail=(s.m||0)-(s.u||0);
+      if(avail>0)availableLevels.push(l);
+    }
+    // Nessuno slot disponibile — avvisa e non far tirare
+    if(availableLevels.length===0){
+      const p=document.getElementById('rpop');
+      p.innerHTML='';
+      p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
+      p.appendChild(mk('div',{style:{color:'var(--rl)',fontSize:'12px',marginBottom:'8px'}},['⚠ Nessuno slot disponibile di livello '+minLv+' o superiore.']));
+      const okBtn=BTN('Chiudi',()=>{p.style.display='none';},'ghost',{style:{width:'100%'}});
+      p.appendChild(okBtn);
+      p.style.display='block';
+      clearTimeout(rpt);
+      return;
+    }
   }
 
   // Mostra prima il selettore del livello/slot usato
@@ -537,20 +566,21 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
 
   const lvSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--gold)',color:'var(--gl)',borderRadius:'4px',padding:'4px 8px',fontSize:'13px',width:'100%',marginBottom:'6px'}});
   if(isCantrip){
-    // Trucchetti scalano col livello personaggio: 1, 5, 11, 17
+    // Trucchetti scalano col livello personaggio: 1, 5, 11, 17 (sempre disponibili, nessuno slot)
     [[1,'Liv. 1-4 (base)'],[5,'Liv. 5-10'],[11,'Liv. 11-16'],[17,'Liv. 17-20']].forEach(([v,l])=>{
       const o=mk('option',{value:v},[l]);
       if((C.lv||1)>=v && (C.lv||1) < (v===1?5:v===5?11:v===11?17:99)) o.selected=true;
       lvSel.appendChild(o);
     });
   } else {
-    // Incantesimi livellati scalano con lo slot usato
-    const minLv=baseLv||1;
-    for(let l=minLv;l<=9;l++){
-      const o=mk('option',{value:l},['Slot '+l+'° livello'+(l===minLv?' (base)':'')]);
-      if(l===minLv)o.selected=true;
+    // Solo i livelli con slot effettivamente disponibili
+    availableLevels.forEach(l=>{
+      const s=C.ss[l]||{m:0,u:0};
+      const avail=(s.m||0)-(s.u||0);
+      const o=mk('option',{value:l},['Slot '+l+'° livello'+(l===baseLv?' (base)':'')+' — '+avail+' disp.']);
+      if(l===baseLv)o.selected=true;
       lvSel.appendChild(o);
-    }
+    });
   }
   p.appendChild(lvSel);
 
@@ -578,8 +608,10 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
           finalDice=newNum+bm[2]+(bm[3]||'');
         }
       }
+      // Consuma automaticamente lo slot scelto
+      consumeSlotIfAvailable(chosenLv);
     }
-    renderSpellRollResult(spellName, finalDice, saveAttr, spCD, pb, scaMod);
+    renderSpellRollResult(spellName, finalDice, saveAttr, spCD, pb, scaMod, isCantrip?null:chosenLv);
   },'gold',{style:{width:'100%'}});
   p.appendChild(confirmBtn);
 
@@ -587,7 +619,22 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
   clearTimeout(rpt); // Non auto-chiude finché l'utente non sceglie
 }
 
-function renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod){
+// Consuma uno slot incantesimo di un dato livello, se disponibile
+function consumeSlotIfAvailable(level){
+  if(!C.ss[level])return;
+  const s=C.ss[level];
+  if((s.u||0)<(s.m||0)){
+    s.u=(s.u||0)+1;
+    save();
+    // Aggiorna la UI se siamo su una pagina che mostra gli slot
+    if(typeof render==='function'){
+      // Non richiamiamo render() completo per non chiudere il popup dadi,
+      // ma salviamo i dati: la prossima apertura della pagina mostrerà lo slot aggiornato
+    }
+  }
+}
+
+function renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, consumedSlot){
   const p=document.getElementById('rpop');
   p.innerHTML='';
   p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
@@ -613,6 +660,9 @@ function renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod){
   }
 
   p.appendChild(row);
+  if(consumedSlot){
+    p.appendChild(mk('div',{style:{color:'var(--bluel)',fontSize:'9px',marginTop:'6px',textAlign:'center'}},['🔹 Slot '+consumedSlot+'° livello consumato']));
+  }
   p.style.display='block';
   clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',6000);
 }
