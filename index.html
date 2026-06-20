@@ -952,6 +952,13 @@ function showSpellModal(name,viewOnly){
           mChkBox(compM,'M',v=>{compM=v;syncComponents();matFieldWrap.style.display=v?'block':'none';}),
         ],{gap:'16px'}),matFieldWrap]),
         DIV([LBL('Descrizione'),TA(dr.de||'',v=>{dr.de=v;})]),
+        mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'4px 0'}}),
+        mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px'}},['🎲 PER IL TIRO DEI DADI (opzionale)']),
+        GRID([
+          DIV([LBL('Dado Danno/Cura'),TI(dr.da||'',v=>{dr.da=v;},'Es. 2d6, 1d8+1...')]),
+          DIV([LBL('Tiro Salvezza'),SEL(dr.sv||'',[['','— Nessuno —'],['str','Forza'],['dex','Destrezza'],['con','Costituzione'],['int','Intelligenza'],['wis','Saggezza'],['cha','Carisma']],v=>{dr.sv=v;},{width:'100%'})]),
+        ],'1fr 1fr',6),
+        DIV([LBL('Scaling ai Livelli Superiori'),TI(dr.daHigher||'',v=>{dr.daHigher=v;},'Es. 1d6 (quanto aggiungere per ogni livello extra)')]),
         ROW([BTN('Salva',()=>{
           if(!C.csp)C.csp={};
           C.csp[name.toLowerCase()]={...dr};
@@ -1002,6 +1009,11 @@ function showSpellModal(name,viewOnly){
         ].filter(Boolean),'1fr 1fr',6,{marginBottom:'10px'}),
         show2.cm&&DIV([LBL('Componente Materiale'),mk('div',{style:{color:'var(--td)',fontSize:'12px',fontStyle:'italic'}},[show2.cm])]),
         mk('div',{style:{color:'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',lineHeight:'1.7',whiteSpace:'pre-wrap'}},[show2.de||'Nessuna descrizione.']),
+        (show2.da||show2.sv)&&mk('div',{style:{marginTop:'8px',padding:'6px 8px',background:'rgba(201,168,76,0.06)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'5px',fontSize:'11px',color:'var(--td)'}},[
+          show2.da?'🎲 Dado: '+show2.da+(show2.daHigher?' (+'+show2.daHigher+'/livello)':''):'',
+          show2.da&&show2.sv?' · ':'',
+          show2.sv?'TS: '+({str:'Forza',dex:'Destrezza',con:'Costituzione',int:'Intelligenza',wis:'Saggezza',cha:'Carisma'}[show2.sv]||show2.sv):''
+        ].join('')),
         BTN('✏ Modifica manuale',()=>{dr={...show2};editing=true;renderSpellModal();},'sm ghost',{marginTop:'10px'})
       ].filter(Boolean),{display:'flex',flexDirection:'column',gap:'6px'});
     }
