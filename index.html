@@ -136,6 +136,7 @@ button.sm{font-size:11px;padding:2px 8px}
   </div>
   <div id="hp" style="color:var(--gold);font-family:var(--ft);font-size:10px;letter-spacing:2px;text-align:center;margin-top:2px"></div>
 </div>
+<div id="action-tracker" style="display:none;padding:5px 10px;background:var(--paper);border-bottom:1px solid var(--border);align-items:center;gap:6px;justify-content:center;flex-wrap:nowrap"></div>
 <div id="content"></div>
 <div id="nav"><div id="nav-inner"></div></div>
 <div id="modal-root"></div>
@@ -338,7 +339,36 @@ function load(){try{const s=localStorage.getItem('dnd5');if(s){const d=JSON.pars
   if(C._lastPage&&PAGES.find(p=>p.id===C._lastPage))PG=C._lastPage;
 }
 let _saveT;
-function save(){clearTimeout(_saveT);_saveT=setTimeout(()=>{try{localStorage.setItem('dnd5',JSON.stringify(C));}catch(e){}},300);}
+// ── Sistema Undo: salva snapshot prima di ogni modifica ──
+let _undoStack=[];
+const UNDO_MAX=15;
+let _undoSnapshotTimer=null;
+function pushUndoSnapshot(){
+  // Debounce: non salvare uno snapshot per ogni singolo keystroke
+  clearTimeout(_undoSnapshotTimer);
+  _undoSnapshotTimer=setTimeout(()=>{
+    try{
+      const snap=JSON.stringify(C);
+      if(_undoStack.length===0||_undoStack[_undoStack.length-1]!==snap){
+        _undoStack.push(snap);
+        if(_undoStack.length>UNDO_MAX)_undoStack.shift();
+      }
+    }catch(e){}
+  },1500);
+}
+function undoLastChange(){
+  if(_undoStack.length<2){alert('Nessuna modifica precedente da annullare.');return;}
+  _undoStack.pop(); // rimuovi lo stato corrente
+  const prev=_undoStack[_undoStack.length-1];
+  try{
+    const restored=JSON.parse(prev);
+    C=restored;
+    save();
+    render();
+  }catch(e){alert('Errore nel ripristino.');}
+}
+
+function save(){clearTimeout(_saveT);_saveT=setTimeout(()=>{try{localStorage.setItem('dnd5',JSON.stringify(C));localStorage.setItem('dnd5_last_local_save',String(Date.now()));}catch(e){}},300);pushUndoSnapshot();}
 function saveNow(){try{localStorage.setItem('dnd5',JSON.stringify(C));}catch(e){}}
 function resetChar(){reset();}
 
@@ -346,6 +376,16 @@ function resetChar(){reset();}
 function sm(s){return Math.floor(((s||10)-10)/2);}
 function profByLevel(lv){return lv>=17?6:lv>=13?5:lv>=9?4:lv>=5?3:2;}
 function fm(n){return n>=0?'+'+n:''+n;}
+// Recupera le risorse che si ricaricano con il tipo di riposo specificato ('short' o 'long')
+function rechargeResources(restType){
+  if(!C.res)return;
+  C.res.forEach(r=>{
+    const rt=r.recharge||'long';
+    if(rt==='none')return;
+    if(restType==='long'&&(rt==='long'||rt==='short')){r.cur=r.max||1;}
+    else if(restType==='short'&&rt==='short'){r.cur=r.max||1;}
+  });
+}
 function roll(f){
   if(!f||!f.trim())return{t:0,r:[],f:'0'};
   // Gestisce formule come "2d6+3", "1d8", "5", "2d6+1d4+3"
@@ -1146,6 +1186,7 @@ function pgMain(){
       if(C.classes&&C.classes.length>0){
         C.classes.forEach((_,ci)=>{const toR=Math.ceil((Number(C.classes[ci].lv)||1)/2);C.classes[ci].hdUsed=Math.max(0,(Number(C.classes[ci].hdUsed)||0)-toR);});
       } else {C.hdUsed=Math.max(0,(C.hdUsed||0)-Math.ceil((C.lv||1)/2));}
+      rechargeResources('short');
       save();render();
     },'sm',{style:{flex:'1',borderColor:'var(--bluel)',color:'var(--bluel)'}}),
     BTN('Riposo Lungo',()=>{
@@ -1155,6 +1196,7 @@ function pgMain(){
       } else {C.hdUsed=Math.max(0,(C.hdUsed||0)-Math.max(1,Math.floor((C.lv||1)/2)));}
       for(let l=1;l<=9;l++){if(C.ss[l])C.ss[l].u=0;}
       C.exhaustion=Math.max(0,(C.exhaustion||0)-1);
+      rechargeResources('long');
       save();render();
     },'sm',{style:{flex:'1',borderColor:'var(--greenl)',color:'var(--greenl)'}})
   ],{gap:'6px',marginTop:'8px',flexWrap:'wrap'}));
@@ -1205,16 +1247,22 @@ function pgMain(){
 
   // Risorse
   const resCard=CARD([
-    ROW([LBL('Risorse'),BTN('+ Risorsa',()=>{C.res.push({n:'',max:1,cur:1});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}),
-    ...(C.res||[]).map((r,i)=>ROW([
-      TI(r.n||'',v=>{C.res[i].n=v;save();},'Channel Divinity...',{flex:'1',fontSize:'12px'}),
-      BTN('▼',()=>{C.res[i].cur=Math.max(0,(r.cur||0)-1);save();render();},'ghost sm'),
-      mk('span',{style:{color:'var(--text)',fontFamily:'var(--ft)',fontSize:'14px',minWidth:'16px',textAlign:'center'}},[String(r.cur||0)]),
-      mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['/']),
-      NI(r.max||1,v=>{C.res[i].max=v;save();},undefined,undefined,{width:'36px'}),
-      BTN('▲',()=>{C.res[i].cur=Math.min(r.max||1,(r.cur||0)+1);save();render();},'ghost sm'),
-      BTN('✕',()=>{C.res.splice(i,1);save();render();},'ghost sm')
-    ],{marginTop:'6px'}))
+    ROW([LBL('Risorse'),BTN('+ Risorsa',()=>{C.res.push({n:'',max:1,cur:1,recharge:'long'});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}),
+    ...(C.res||[]).map((r,i)=>mk('div',{style:{marginTop:'6px',display:'flex',flexDirection:'column',gap:'3px'}},[
+      ROW([
+        TI(r.n||'',v=>{C.res[i].n=v;save();},'Channel Divinity...',{flex:'1',fontSize:'12px'}),
+        BTN('▼',()=>{C.res[i].cur=Math.max(0,(r.cur||0)-1);save();render();},'ghost sm'),
+        mk('span',{style:{color:'var(--text)',fontFamily:'var(--ft)',fontSize:'14px',minWidth:'16px',textAlign:'center'}},[String(r.cur||0)]),
+        mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['/']),
+        NI(r.max||1,v=>{C.res[i].max=v;save();},undefined,undefined,{width:'36px'}),
+        BTN('▲',()=>{C.res[i].cur=Math.min(r.max||1,(r.cur||0)+1);save();render();},'ghost sm'),
+        BTN('✕',()=>{C.res.splice(i,1);save();render();},'ghost sm')
+      ]),
+      ROW([
+        mk('span',{style:{color:'var(--tk)',fontSize:'10px',flexShrink:0}},['Ricarica:']),
+        SEL(r.recharge||'long',[['long','Riposo Lungo'],['short','Riposo Breve'],['none','Manuale']],v=>{C.res[i].recharge=v;save();},{fontSize:'10px',width:'120px'})
+      ])
+    ]))
   ]);
   p.appendChild(resCard);
 
@@ -1381,6 +1429,8 @@ function pgCombat(){
       }
       for(let l=1;l<=9;l++){if(C.ss[l])C.ss[l].u=0;}
       C.exhaustion=Math.max(0,(C.exhaustion||0)-1);
+      rechargeResources('long');
+      C.turnActions={a:false,ab:false,r:false,m:false};
       save();render();
     },'sm',{style:{width:'100%',marginTop:'6px',borderColor:'var(--greenl)',color:'var(--greenl)',background:'rgba(42,107,58,0.1)'}});
 
@@ -1474,9 +1524,9 @@ function pgCombat(){
   }
 
   // ── Attacchi con Armi ──
-  function atkSection(list,key,title,isM){
+  function atkSection(list,key,title){
     const sec=mk('div');
-    const hdr=ROW([LBL(title,{color:isM?'var(--purl)':'var(--gold)'}),BTN('+ Aggiungi',()=>{C[key].push({n:'',stat:isM?'int':'str',pr:true,dmg:'1d6',dt:'',ex:0,cd:'',nt:''});save();render();},isM?'sm gold':'sm')],{justifyContent:'space-between',marginBottom:'4px'});
+    const hdr=ROW([LBL(title,{color:'var(--gold)'}),BTN('+ Aggiungi',()=>{C[key].push({n:'',stat:'str',pr:true,dmg:'1d6',dt:'',ex:0,cd:'',nt:''});save();render();},'sm')],{justifyContent:'space-between',marginBottom:'4px'});
     sec.appendChild(hdr);
     (list||[]).forEach((a,i)=>{
       const bon=(S[a.stat]||0)+(a.pr?pb:0)+(Number(a.ex)||0);
@@ -1488,7 +1538,7 @@ function pgCombat(){
         toggleArr,
         TI(a.n||'',v=>{C[key][i].n=v;save();},'Nome attacco',{flex:'1',fontFamily:'var(--ft)',fontSize:'12px'}),
         a.mastery?mk('span',{style:{fontSize:'9px',color:'var(--gold)',border:'1px solid var(--gd)',borderRadius:'3px',padding:'0 4px',fontFamily:'monospace',flexShrink:0}},[a.mastery]):mk('span',{},['']),
-        BTN('⚄',()=>{ showAttackRoll(a, isM); },'gold sm'),
+        BTN('⚄',()=>{ showAttackRoll(a, false); },'gold sm'),
         BTN('✕',()=>{C[key].splice(i,1);save();render();},'ghost sm')
       ],{marginBottom:isOpen?'4px':'0'});
       card.appendChild(nameRow);
@@ -1513,7 +1563,7 @@ function pgCombat(){
     });
     return sec;
   }
-  p.appendChild(atkSection(C.wa,'wa','⚔ Attacchi con Armi',false));
+  p.appendChild(atkSection(C.wa,'wa','⚔ Attacchi con Armi'));
 
   // ── Incantesimi di Attacco (da incantesimi flaggati "Attacco") ──
   const div1=mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}});
@@ -2890,6 +2940,27 @@ function pgSettings(){
   // ── Account ──
   const isLogged=typeof sbUser!=='undefined'&&sbUser;
   const accountCard=CARD([LBL('👤 Account')]);
+
+  // Funzione per formattare il tempo trascorso
+  function timeAgo(ts){
+    if(!ts)return 'mai';
+    const diff=Date.now()-Number(ts);
+    const min=Math.floor(diff/60000);
+    if(min<1)return 'pochi secondi fa';
+    if(min===1)return '1 minuto fa';
+    if(min<60)return min+' minuti fa';
+    const h=Math.floor(min/60);
+    if(h===1)return '1 ora fa';
+    if(h<24)return h+' ore fa';
+    return Math.floor(h/24)+' giorni fa';
+  }
+  const lastLocal=localStorage.getItem('dnd5_last_local_save');
+  const lastCloud=localStorage.getItem('dnd5_last_cloud_save');
+  const backupInfo=mk('div',{style:{fontSize:'11px',color:'var(--tk)',marginBottom:'8px',lineHeight:'1.6'}});
+  backupInfo.appendChild(mk('div',null,['💾 Backup locale: '+timeAgo(lastLocal)]));
+  if(isLogged)backupInfo.appendChild(mk('div',null,['☁ Ultimo salvataggio cloud: '+timeAgo(lastCloud)]));
+  accountCard.appendChild(backupInfo);
+
   if(isLogged){
     accountCard.appendChild(ROW([
       mk('span',{style:{color:'var(--text)',fontFamily:'var(--fb)',fontSize:'13px'}},[sbUser.email||'']),
@@ -2927,6 +2998,13 @@ function pgSettings(){
     ],{marginTop:'6px',marginBottom:'6px'}),
     ROW([
       BTN('⬆ Importa Scheda (.json)',()=>{document.getElementById('ifile').click();},'sm',{style:{flex:'1'}}),
+    ],{marginBottom:'6px'}),
+    ROW([
+      BTN('↺ Annulla Ultima Modifica',()=>{
+        if(confirm('Annullare l\'ultima modifica fatta alla scheda?')){
+          if(typeof undoLastChange==='function')undoLastChange();
+        }
+      },'sm',{style:{flex:'1',color:'var(--bluel)',borderColor:'var(--blue)'}}),
     ]),
   ]);
   p.appendChild(dataCard);
@@ -2991,6 +3069,36 @@ function updateHdr(){
     });
   } else if(condBanner){
     condBanner.remove();
+  }
+
+  // ── Tracker Azioni del Turno — solo in combat ──
+  const actBar=document.getElementById('action-tracker');
+  if(PG==='combat'){
+    if(!C.turnActions)C.turnActions={a:false,ab:false,r:false,m:false};
+    actBar.style.display='flex';
+    actBar.innerHTML='';
+    const ACTS=[['a','A'],['ab','AB'],['r','R'],['m','M']];
+    const LABELS={a:'Azione',ab:'Azione Bonus',r:'Reazione',m:'Movimento'};
+    ACTS.forEach(([key,short])=>{
+      const used=!!C.turnActions[key];
+      const btn=mk('button',{title:LABELS[key],style:{
+        background:used?'rgba(139,32,32,0.25)':'var(--card)',
+        border:'1px solid '+(used?'var(--rl)':'var(--border)'),
+        color:used?'var(--rl)':'var(--td)',
+        borderRadius:'5px',padding:'3px 10px',fontSize:'11px',fontFamily:'var(--ft)',
+        cursor:'pointer',minWidth:'30px',textAlign:'center',flexShrink:0,
+      }},[short+(used?' ✕':'')]);
+      btn.addEventListener('click',()=>{C.turnActions[key]=!used;save();updateHdr();});
+      actBar.appendChild(btn);
+    });
+    const resetBtn=mk('button',{title:'Reset turno',style:{
+      background:'transparent',border:'1px solid var(--border)',color:'var(--gold)',
+      borderRadius:'5px',padding:'3px 8px',fontSize:'12px',cursor:'pointer',flexShrink:0,marginLeft:'4px',
+    }},['↺']);
+    resetBtn.addEventListener('click',()=>{C.turnActions={a:false,ab:false,r:false,m:false};save();updateHdr();});
+    actBar.appendChild(resetBtn);
+  } else {
+    actBar.style.display='none';
   }
 }
 function renderNav(){
@@ -3288,7 +3396,10 @@ async function sbSaveToCloud() {
     sbUpdateSync('error');
   } else {
     sbUpdateSync('saved');
-    try { localStorage.setItem('dnd5_cloud_backup', JSON.stringify(C)); } catch(e) {}
+    try {
+      localStorage.setItem('dnd5_cloud_backup', JSON.stringify(C));
+      localStorage.setItem('dnd5_last_cloud_save', String(Date.now()));
+    } catch(e) {}
   }
 }
 
