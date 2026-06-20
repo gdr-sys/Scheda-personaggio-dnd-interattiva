@@ -3379,30 +3379,27 @@ async function sbOpenScheda(schedaId) {
   const ct = document.getElementById('content');
   ct.innerHTML = `<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--td);font-family:var(--ft);font-size:13px;letter-spacing:1px">
     <div>⟳ Caricamento...</div>
-    <button onclick="window._emergencyExit()" style="background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--td);font-size:11px;padding:6px 14px;cursor:pointer;font-family:var(--fb);letter-spacing:0">Bloccato? Clicca qui</button>
+    <button onclick="window._emergencyExit()" style="background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--td);font-size:11px;padding:6px 14px;cursor:pointer;font-family:var(--fb);letter-spacing:0">Bloccato? Vai alla lista personaggi</button>
   </div>`;
   window._emergencyExit = ()=>{
     localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
     sbSchedaId=null;
-    sbLoadSchedeList();
+    // Forza la visualizzazione della lista offline se possibile, altrimenti ricarica
+    location.reload();
   };
 
-  // Timeout di sicurezza — se dopo 10 secondi non risponde, va alla lista
-  const timeout = setTimeout(() => {
-    if (!sbSchedaId) {
-      localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
-      sbLoadSchedeList();
-    }
-  }, 10000);
+  // AbortController: forza l'interruzione della richiesta fetch dopo 8 secondi
+  const ac = new AbortController();
+  const abortTimer = setTimeout(() => ac.abort(), 8000);
 
   let data, error;
   try {
-    const res = await sb.from('schede').select('*').eq('id', schedaId).single();
+    const res = await sb.from('schede').select('*').eq('id', schedaId).abortSignal(ac.signal).single();
     data = res.data; error = res.error;
   } catch(e) {
     error = e;
   }
-  clearTimeout(timeout);
+  clearTimeout(abortTimer);
 
   if (error || !data) {
     localStorage.removeItem('dnd5_last_scheda_' + (sbUser?.id||''));
@@ -3519,22 +3516,27 @@ async function sbLoadSchedeList() {
   };
 
   let data, error;
+  const ac2 = new AbortController();
+  const abortTimer2 = setTimeout(() => ac2.abort(), 8000);
   try {
     const res = await sb.from('schede')
       .select('*')
       .eq('user_id', sbUser.id)
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .abortSignal(ac2.signal);
     data = res.data; error = res.error;
   } catch(e) {
     error = e;
   }
+  clearTimeout(abortTimer2);
 
   if (error) {
     document.getElementById('content').innerHTML = '';
+    const isTimeout = error.name==='AbortError'||/abort/i.test(error.message||'');
     const errDiv=mk('div',{style:{minHeight:'80vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'16px',padding:'24px',textAlign:'center'}});
-    errDiv.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'13px'}},['⚠ Errore nel caricare le schede']));
-    errDiv.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'12px',maxWidth:'260px'}},[error.message||'Errore sconosciuto']));
-    const retryBtn=BTN('Riprova',()=>sbLoadSchedeList(),'gold');
+    errDiv.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'13px'}},[isTimeout?'⚠ Connessione lenta o assente':'⚠ Errore nel caricare le schede']));
+    errDiv.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'12px',maxWidth:'260px'}},[isTimeout?'Il server non ha risposto in tempo. Controlla la tua connessione internet e riprova.':(error.message||'Errore sconosciuto')]));
+    const retryBtn=BTN('↻ Riprova',()=>sbLoadSchedeList(),'gold');
     errDiv.appendChild(retryBtn);
     document.getElementById('content').appendChild(errDiv);
     return;
