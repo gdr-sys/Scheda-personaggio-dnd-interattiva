@@ -3201,12 +3201,42 @@ if(typeof sb === 'undefined') render();
 const SUPABASE_URL = 'https://cxxxiobqgfjpiitqelzf.supabase.co';   // es: https://abc123xyz.supabase.co
 const SUPABASE_KEY = 'sb_publishable_pTbauTK629bSw9FG2qZJuw_dD_OUxt-';      // la chiave lunga che inizia con eyJ...
 
+// ── Controllo che la libreria Supabase sia caricata ──
+if (typeof supabase === 'undefined') {
+  document.getElementById('content').innerHTML = `
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center">
+      <div style="color:var(--rl);font-family:var(--ft);font-size:16px">⚠ Libreria Cloud non caricata</div>
+      <div style="color:var(--td);font-size:13px;max-width:300px;line-height:1.6">
+        Il salvataggio cloud non è disponibile in questo momento (problema di rete o connessione bloccata).
+        I tuoi dati sono comunque al sicuro in locale su questo dispositivo.
+      </div>
+      <button onclick="location.reload()" style="background:var(--card);border:1px solid var(--gold);border-radius:6px;color:var(--gold);font-size:13px;padding:8px 20px;cursor:pointer;font-family:var(--ft)">↻ Riprova</button>
+    </div>`;
+  document.getElementById('nav').style.display = '';
+  throw new Error('Supabase library not loaded');
+}
+
 // ── Variabili di stato ──
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let sbUser        = null;
 let sbSchedaId    = null;
 let sbSaveTimer   = null;
 const SB_MAX_SCHEDE = 10;
+
+// ── Timeout globale: se Supabase non risponde in 12s, mostra fallback ──
+window._sbInitTimeout = setTimeout(() => {
+  const ct = document.getElementById('content');
+  if (ct && ct.innerHTML.includes('Caricamento') && !sbUser) {
+    ct.innerHTML = `
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:32px;text-align:center">
+        <div style="color:var(--rl);font-family:var(--ft);font-size:16px">⚠ Connessione al cloud non riuscita</div>
+        <div style="color:var(--td);font-size:13px;max-width:300px;line-height:1.6">
+          Non riesco a contattare il server dopo diversi secondi. Controlla la connessione internet.
+        </div>
+        <button onclick="location.reload()" style="background:var(--card);border:1px solid var(--gold);border-radius:6px;color:var(--gold);font-size:13px;padding:8px 20px;cursor:pointer;font-family:var(--ft)">↻ Ricarica pagina</button>
+      </div>`;
+  }
+}, 12000);
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║              STATO SYNC NELL'HEADER                          ║
