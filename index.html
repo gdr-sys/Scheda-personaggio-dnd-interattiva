@@ -2994,8 +2994,19 @@ function renderNav(){
   });
 }
 let _isRendering=false;
+let _renderErrorCount=0;
 function render(){
-  if(_isRendering)return;
+  if(_isRendering){
+    // Se siamo bloccati in rendering da troppo tempo, forza il reset
+    _renderErrorCount++;
+    if(_renderErrorCount>3){
+      _isRendering=false;
+      _renderErrorCount=0;
+    } else {
+      return;
+    }
+  }
+  _renderErrorCount=0;
   _isRendering=true;
   try{
   const ct=document.getElementById('content');
@@ -3131,6 +3142,48 @@ function toggleTheme(){
   localStorage.setItem('dnd-theme',light?'dark':'light');
   applyTheme();
 }
+
+// ── GESTORE ERRORI GLOBALE (visibile anche senza console, utile su mobile) ──
+window.addEventListener('error', function(ev) {
+  console.error('Errore globale:', ev.error);
+  let errBox = document.getElementById('global-error-box');
+  if(!errBox){
+    errBox = document.createElement('div');
+    errBox.id = 'global-error-box';
+    errBox.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#3a0a0a;border-top:2px solid #c94040;color:#f4ecdc;font-family:monospace;font-size:11px;padding:10px;z-index:99999;max-height:40vh;overflow-y:auto;white-space:pre-wrap;word-break:break-word;';
+    document.body.appendChild(errBox);
+  }
+  const msg = (ev.error && ev.error.stack) ? ev.error.stack : (ev.message || 'Errore sconosciuto');
+  const entry = document.createElement('div');
+  entry.style.cssText = 'margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #5a2020;';
+  entry.textContent = '⚠ ' + msg;
+  errBox.appendChild(entry);
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'Chiudi errori ✕';
+  closeBtn.style.cssText = 'background:#c94040;color:#fff;border:none;border-radius:4px;padding:4px 10px;margin-top:4px;cursor:pointer;font-size:11px;';
+  closeBtn.onclick = () => errBox.remove();
+  if(!errBox.querySelector('button')) errBox.appendChild(closeBtn);
+});
+window.addEventListener('unhandledrejection', function(ev) {
+  console.error('Promise rejection:', ev.reason);
+  let errBox = document.getElementById('global-error-box');
+  if(!errBox){
+    errBox = document.createElement('div');
+    errBox.id = 'global-error-box';
+    errBox.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#3a0a0a;border-top:2px solid #c94040;color:#f4ecdc;font-family:monospace;font-size:11px;padding:10px;z-index:99999;max-height:40vh;overflow-y:auto;white-space:pre-wrap;word-break:break-word;';
+    document.body.appendChild(errBox);
+  }
+  const msg = (ev.reason && ev.reason.stack) ? ev.reason.stack : String(ev.reason || 'Promise rejection sconosciuta');
+  const entry = document.createElement('div');
+  entry.style.cssText = 'margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #5a2020;';
+  entry.textContent = '⚠ PROMISE: ' + msg;
+  errBox.appendChild(entry);
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'Chiudi errori ✕';
+  closeBtn.style.cssText = 'background:#c94040;color:#fff;border:none;border-radius:4px;padding:4px 10px;margin-top:4px;cursor:pointer;font-size:11px;';
+  closeBtn.onclick = () => errBox.remove();
+  if(!errBox.querySelector('button')) errBox.appendChild(closeBtn);
+});
 
 // ── INIT ──
 load();applyTheme();
