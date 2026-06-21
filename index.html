@@ -477,6 +477,14 @@ function buildDmgFormula(dmgDice, statKey, extraBonus){
 }
 
 // Popup dado migliorato — mostra tiro colpire + danni separati
+// Pulsante X per chiudere manualmente il popup dei dadi
+function addRpopCloseBtn(p){
+  const closeBtn=mk('span',{style:{position:'absolute',top:'4px',right:'6px',color:'var(--td)',fontSize:'14px',cursor:'pointer',lineHeight:'1',padding:'2px',userSelect:'none'},title:'Chiudi'},['✕']);
+  closeBtn.addEventListener('click',()=>{p.style.display='none';clearTimeout(rpt);});
+  p.style.position='relative';
+  p.appendChild(closeBtn);
+}
+
 function showAttackRoll(atk, isSpell){
   const S={str:sm(C.str),dex:sm(C.dex),con:sm(C.con),int:sm(C.int),wis:sm(C.wis),cha:sm(C.cha)};
   const pb=C.prof||2;
@@ -554,6 +562,7 @@ function showAttackRoll(atk, isSpell){
   }
   row.appendChild(dmgCol);
   p.appendChild(row);
+  addRpopCloseBtn(p);
 
   p.style.display='block';
   clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',6000);
@@ -710,6 +719,7 @@ function renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, c
   if(consumedSlot){
     p.appendChild(mk('div',{style:{color:'var(--bluel)',fontSize:'9px',marginTop:'6px',textAlign:'center'}},['🔹 Slot '+consumedSlot+'° livello consumato']));
   }
+  addRpopCloseBtn(p);
   p.style.display='block';
   clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',6000);
 }
@@ -834,6 +844,7 @@ function showRoll(formula,label){
   p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px'}},[label]));
   p.appendChild(mk('div',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'26px'}},[String(r.t)]));
   p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px'}},[r.f+' → ['+r.r.join(',')+']']));
+  addRpopCloseBtn(p);
   p.style.display='block';
   clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',3000);
 }
@@ -1014,7 +1025,7 @@ function showSpellModal(name,viewOnly){
           show2.da&&show2.sv?' · ':'',
           show2.sv?'TS: '+({str:'Forza',dex:'Destrezza',con:'Costituzione',int:'Intelligenza',wis:'Saggezza',cha:'Carisma'}[show2.sv]||show2.sv):''
         ].join('')),
-        BTN('✏ Modifica manuale',()=>{dr={...show2};editing=true;renderSpellModal();},'sm ghost',{marginTop:'10px'})
+        !viewOnly&&BTN('✏ Modifica manuale',()=>{dr={...show2};editing=true;renderSpellModal();},'sm ghost',{marginTop:'10px'})
       ].filter(Boolean),{display:'flex',flexDirection:'column',gap:'6px'});
     }
     const box=CARD([
@@ -3764,6 +3775,15 @@ async function sbOpenScheda(schedaId) {
   if(!C.skBonus)C.skBonus={};
   if(!C.ss)C.ss={1:{m:0,u:0},2:{m:0,u:0},3:{m:0,u:0},4:{m:0,u:0},5:{m:0,u:0},6:{m:0,u:0},7:{m:0,u:0},8:{m:0,u:0},9:{m:0,u:0}};
   if(!C.sk||!C.sk.acrobazia)C.sk=JSON.parse(JSON.stringify(DEF.sk));
+
+  // Registra i timestamp di backup basati sui dati appena caricati dal cloud
+  try{
+    localStorage.setItem('dnd5', JSON.stringify(C));
+    localStorage.setItem('dnd5_last_local_save', String(Date.now()));
+    if(data.updated_at){
+      localStorage.setItem('dnd5_last_cloud_save', String(new Date(data.updated_at).getTime()));
+    }
+  }catch(e){}
 
   document.getElementById('nav').style.display = '';
   ct.innerHTML = '';
