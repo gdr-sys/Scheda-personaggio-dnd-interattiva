@@ -151,11 +151,12 @@ body.light .nb.on .tx{color:var(--gl)}
 // ══ DATA ══
 const PAGES=[
   {id:'main',ic:'📜',tx:'Principale'},{id:'skills',ic:'🎯',tx:'Abilità'},
-  {id:'combat',ic:'⚔',tx:'Combattimento'},{id:'spells',ic:'✨',tx:'Incantesimi'},
+  {id:'combat',ic:'⚔',tx:'Combattimento'},
+  {id:'companions',ic:'🐾',tx:'Companion'},{id:'wildshape',ic:'🐺',tx:'Forma Selv.'},
+  {id:'spells',ic:'✨',tx:'Incantesimi'},
   {id:'features',ic:'⭐',tx:'Privilegi'},
   {id:'combo',ic:'⚡',tx:'Combo'},{id:'inventory',ic:'🎒',tx:'Inventario'},{id:'personality',ic:'🎭',tx:'Personalità'},
   {id:'diario',ic:'📓',tx:'Diario'},{id:'world',ic:'🗺',tx:'Mondo'},{id:'homebrew',ic:'⚗',tx:'Homebrew'},
-  {id:'companions',ic:'🐾',tx:'Companion'},{id:'wildshape',ic:'🐺',tx:'Forma Selv.'},
   {id:'settings',ic:'⚙',tx:'Impostazioni'},
 ];
 
@@ -1169,7 +1170,9 @@ function pgMain(){
         newCls.sub=C.sub||'';newCls.lv=C.lv||1;
         newCls.hdType=CLASS_HD[newCls.name]||C.hdType||'1d8';
       }
-      C.classes.push(newCls);save();render();
+      C.classes.push(newCls);
+      if(newCls.name==='Druido')C.showWildshape=true;
+      save();render();
     },'sm gold')
   ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}));
 
@@ -1191,6 +1194,7 @@ function pgMain(){
         C.classes[ci].name=ev.target.value;
         C.classes[ci].hdType=CLASS_HD[ev.target.value]||'1d8';
         if(ci===0){C.cls=ev.target.value;}
+        if(ev.target.value==='Druido')C.showWildshape=true;
         save();render();
       });
       row.appendChild(clsSel);
@@ -1561,6 +1565,16 @@ function pgCombat(){
   if(!C.resistances)C.resistances=[];
   if(!C.immunities)C.immunities=[];
   if(!C.vulnerabilities)C.vulnerabilities=[];
+
+  // ── Rilevamento automatico Druido: mostra pulsante Forma Selvatica ──
+  const hasDruido=(C.classes&&C.classes.length>0)
+    ? C.classes.some(cl=>cl.name==='Druido')
+    : (C.cls||'').toLowerCase()==='druido';
+  if(hasDruido && !C.showWildshape){C.showWildshape=true;save();}
+  if(hasDruido){
+    const wsBtn=BTN('🐺 Vai a Forma Selvatica',()=>{PG='wildshape';C._lastPage='wildshape';save();render();},'gold sm',{style:{width:'100%',marginBottom:'8px'}});
+    p.appendChild(wsBtn);
+  }
 
   // ── Concentrazione ──
   const concCard=mk('div',{style:{
@@ -2997,19 +3011,81 @@ function pgCompanionGeneric(listKey, pageTitle, pageIcon){
       DIV([LBL('Linguaggi'),TA(comp.languages||'',v=>{C[listKey][ci].languages=v;},'Comprende il Comune...')]),
     ],'1fr 1fr',6,{marginTop:'8px'}));
 
-    // Abilità/Competenze
-    body.appendChild(DIV([LBL('Abilità & Competenze'),TA(comp.skills||'',v=>{C[listKey][ci].skills=v;},'Percezione +4, Furtività +6...')],{marginTop:'8px'}));
+    // Abilità standard — collassabile, cliccabili per tirare
+    if(!comp.skillsOpen)comp.skillsOpen=false;
+    const SKILL_DEFS=[
+      ['acrobazia','dex'],['addestrare animali','wis'],['arcano','int'],['atletica','str'],
+      ['intrattenere','cha'],['furtività','dex'],['indagare','int'],['inganno','cha'],
+      ['intimidazione','cha'],['intuizione','wis'],['medicina','wis'],['natura','int'],
+      ['percezione','wis'],['persuasione','cha'],['rapidità di mano','dex'],['religione','int'],
+      ['sopravvivenza','wis'],['storia','int'],
+    ];
+    const skillsSec=mk('div',{style:{marginTop:'8px'}});
+    const skillsHdr=mk('div',{style:{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',padding:'4px 0'}});
+    skillsHdr.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[comp.skillsOpen?'▲':'▼']));
+    skillsHdr.appendChild(mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'12px'}},['🎯 Abilità (tira dado)']));
+    skillsHdr.addEventListener('click',()=>{C[listKey][ci].skillsOpen=!comp.skillsOpen;save();render();});
+    skillsSec.appendChild(skillsHdr);
+    if(comp.skillsOpen){
+      if(!comp.skillProf)comp.skillProf={};
+      const skillsList=mk('div',{style:{marginTop:'4px'}});
+      SKILL_DEFS.forEach(([skName,skStat])=>{
+        const isProf=!!(comp.skillProf||{})[skName];
+        const total=S[skStat]+(isProf?pb:0);
+        const skRow=mk('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'3px 0',borderBottom:'1px solid rgba(90,62,27,.15)'}});
+        const profChk=CHK(isProf,v=>{if(!C[listKey][ci].skillProf)C[listKey][ci].skillProf={};C[listKey][ci].skillProf[skName]=v;save();render();});
+        skRow.appendChild(profChk);
+        skRow.appendChild(mk('span',{style:{color:isProf?'var(--text)':'var(--td)',fontFamily:'var(--fb)',fontSize:'12px',flex:'1',textTransform:'capitalize'}},[skName+' ('+SL2[skStat]+')']));
+        const skRollBtn=BTN(fm(total),()=>showRoll('1d20'+fm(total),skName.charAt(0).toUpperCase()+skName.slice(1)),'gold sm',{style:{minWidth:'40px',padding:'2px 6px',fontFamily:'var(--ft)',fontSize:'12px'}});
+        skRow.appendChild(skRollBtn);
+        skillsList.appendChild(skRow);
+      });
+      skillsSec.appendChild(skillsList);
+    }
+    body.appendChild(skillsSec);
 
-    // Attacchi/Armi
+    // Abilità/Competenze (note libere aggiuntive)
+    body.appendChild(DIV([LBL('Note Abilità & Competenze'),TA(comp.skills||'',v=>{C[listKey][ci].skills=v;},'Es. Vantaggio a Percezione, doppio bonus su Furtività...')],{marginTop:'8px'}));
+
+    // Attacchi/Armi — cliccabili per tirare i dadi
     const wpSec=mk('div',{style:{marginTop:'8px'}});
     wpSec.appendChild(ROW([LBL('Attacchi'),BTN('+ Attacco',()=>{if(!C[listKey][ci].weapons)C[listKey][ci].weapons=[];C[listKey][ci].weapons.push({n:'',atk:0,dmg:'1d6',type:''});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}));
     (comp.weapons||[]).forEach((w,wi)=>{
-      wpSec.appendChild(GRID([
+      const wRow=mk('div',{style:{marginTop:'6px',padding:'6px',background:'rgba(0,0,0,0.12)',borderRadius:'6px'}});
+      wRow.appendChild(GRID([
         TI(w.n||'',v=>{C[listKey][ci].weapons[wi].n=v;save();},'Nome',{fontSize:'11px'}),
         NI(w.atk||0,v=>{C[listKey][ci].weapons[wi].atk=v;save();},undefined,undefined,{width:'100%'}),
         TI(w.dmg||'',v=>{C[listKey][ci].weapons[wi].dmg=v;save();},'1d6',{fontSize:'11px'}),
         TI(w.type||'',v=>{C[listKey][ci].weapons[wi].type=v;save();},'Tipo',{fontSize:'11px'}),
-      ],'2fr 1fr 1fr 1fr',4,{marginTop:'4px'}));
+      ],'2fr 1fr 1fr 1fr',4));
+      const rollRow=ROW([
+        BTN('⚄ Tira Attacco',()=>{
+          const p2=document.getElementById('rpop');
+          p2.innerHTML='';
+          p2.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[(w.n||'Attacco')]));
+          const hitR=roll('1d20'+fm(w.atk||0));
+          const dmgR=roll(w.dmg||'1d6');
+          const isCrit=hitR.r[0]===20;
+          const rRow=mk('div',{style:{display:'flex',gap:'10px',alignItems:'flex-start'}});
+          const hitCol=mk('div',{style:{textAlign:'center',flex:'1'}});
+          hitCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['COLPIRE']));
+          hitCol.appendChild(mk('div',{style:{color:isCrit?'var(--gl)':'var(--text)',fontFamily:'var(--ft)',fontSize:'22px',lineHeight:'1'}},[String(hitR.t)]));
+          rRow.appendChild(hitCol);
+          rRow.appendChild(mk('div',{style:{width:'1px',background:'var(--border)',alignSelf:'stretch'}}));
+          const dmgCol=mk('div',{style:{textAlign:'center',flex:'1'}});
+          dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['DANNI']));
+          dmgCol.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'22px',lineHeight:'1'}},[String(dmgR.t)]));
+          dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px'}},[w.dmg+(w.type?' '+w.type:'')]));
+          rRow.appendChild(dmgCol);
+          p2.appendChild(rRow);
+          if(typeof addRpopCloseBtn==='function')addRpopCloseBtn(p2);
+          p2.style.display='block';
+          clearTimeout(rpt);rpt=setTimeout(()=>p2.style.display='none',6000);
+        },'gold sm',{style:{flex:'1'}}),
+        BTN('✕',()=>{C[listKey][ci].weapons.splice(wi,1);save();render();},'ghost sm'),
+      ],{gap:'6px',marginTop:'4px'});
+      wRow.appendChild(rollRow);
+      wpSec.appendChild(wRow);
     });
     body.appendChild(wpSec);
 
