@@ -1953,7 +1953,7 @@ function pgCombat(){
 // Costruisce le opzioni categoria per gli incantesimi: fisse + custom create dall'utente
 function buildSpellCatOptions(currentVal, selectEl){
   if(!C.spellCategories)C.spellCategories=[];
-  const fixed=[['','—'],['attack','Attacco'],['buff','Buff'],['heal','Cura']];
+  const fixed=[['','—'],['attack','Attacco'],['buff','Buff e Debuff'],['heal','Cura']];
   const custom=C.spellCategories.map(cat=>[cat.key,cat.label]);
   [...fixed,...custom,['__new__','+ Nuova categoria...']].forEach(([v,lb])=>{
     const o=mk('option',{value:v},[lb]);
