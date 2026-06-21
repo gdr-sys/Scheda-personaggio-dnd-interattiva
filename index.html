@@ -1542,8 +1542,14 @@ function pgMain(){
   }
   const SM_cha=sm(C.cha);
   const isBardo=(C.classes&&C.classes.length>0)?C.classes.some(cl=>cl.name==='Bardo'):(C.cls||'').toLowerCase()==='bardo';
-  const isBattleMaster=((C.classes&&C.classes.length>0)?C.classes.some(cl=>cl.name==='Guerriero'):(C.cls||'').toLowerCase()==='guerriero')
-    && ((C.sub||'').toLowerCase().includes('battle master')||(C.sub||'').toLowerCase().includes('maestro di battaglia')||(C.sub||'').toLowerCase().includes('combattimento'));
+  // Cerca la classe Guerriero (in qualunque posizione nel multiclasse) e legge la SUA sottoclasse
+  function normalizeSubclass(s){return (s||'').toLowerCase().trim().replace(/\s+/g,' ');}
+  const fighterClassObj=(C.classes&&C.classes.length>0)?C.classes.find(cl=>cl.name==='Guerriero'):null;
+  const fighterSub=fighterClassObj?normalizeSubclass(fighterClassObj.sub):((C.cls||'').toLowerCase()==='guerriero'?normalizeSubclass(C.sub):'');
+  const isBattleMaster=!!fighterSub && (
+    fighterSub.includes('battle master')||fighterSub.includes('battlemaster')||
+    fighterSub.includes('maestro di battaglia')||fighterSub.includes('maestro battaglia')
+  );
   if(isBardo){
     ensureScalingResource('bardic','Ispirazione Bardica',lv=>lv>=15?'1d12':lv>=10?'1d10':lv>=5?'1d8':'1d6',lv=>Math.max(1,SM_cha));
   }
