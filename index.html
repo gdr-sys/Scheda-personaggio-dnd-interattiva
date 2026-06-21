@@ -1527,34 +1527,46 @@ function pgMain(){
   p.appendChild(exCard);
 
   // ── Auto-gestione risorse con dado scalabile (Ispirazione Bardica, Dadi Superiorità) ──
-  function ensureScalingResource(key, name, dieByLevel, maxByLevel){
+  // classLv: livello SPECIFICO nella classe (non il totale del personaggio)
+  function ensureScalingResource(key, name, classLv, dieByLevel, maxByLevel){
     if(!C.res)C.res=[];
-    const die=dieByLevel(C.lv||1);
+    const die=dieByLevel(classLv);
     let r=C.res.find(rr=>rr._scalingKey===key);
     if(!r){
-      const initialMax=maxByLevel?maxByLevel(C.lv||1):1;
+      const initialMax=maxByLevel?maxByLevel(classLv):1;
       r={n:name,max:initialMax,cur:initialMax,recharge:'long',die:die,_scalingKey:key,auto:true};
       C.res.push(r);
     } else {
-      r.die=die; // aggiorna il dado in base al livello corrente
+      r.die=die; // aggiorna il dado in base al livello di classe corrente
+      r.max=maxByLevel?maxByLevel(classLv):r.max;
+      if(r.cur>r.max)r.cur=r.max;
       if(!r.n)r.n=name;
     }
   }
   const SM_cha=sm(C.cha);
-  const isBardo=(C.classes&&C.classes.length>0)?C.classes.some(cl=>cl.name==='Bardo'):(C.cls||'').toLowerCase()==='bardo';
+  function getClassLevel(className){
+    if(C.classes&&C.classes.length>0){
+      const cl=C.classes.find(c=>c.name===className);
+      return cl?Number(cl.lv)||0:0;
+    }
+    return (C.cls||'').toLowerCase()===className.toLowerCase()?(C.lv||0):0;
+  }
+  const bardLv=getClassLevel('Bardo');
+  const isBardo=bardLv>0;
   // Cerca la classe Guerriero (in qualunque posizione nel multiclasse) e legge la SUA sottoclasse
   function normalizeSubclass(s){return (s||'').toLowerCase().trim().replace(/\s+/g,' ');}
   const fighterClassObj=(C.classes&&C.classes.length>0)?C.classes.find(cl=>cl.name==='Guerriero'):null;
   const fighterSub=fighterClassObj?normalizeSubclass(fighterClassObj.sub):((C.cls||'').toLowerCase()==='guerriero'?normalizeSubclass(C.sub):'');
+  const fighterLv=getClassLevel('Guerriero');
   const isBattleMaster=!!fighterSub && (
     fighterSub.includes('battle master')||fighterSub.includes('battlemaster')||
     fighterSub.includes('maestro di battaglia')||fighterSub.includes('maestro battaglia')
   );
   if(isBardo){
-    ensureScalingResource('bardic','Ispirazione Bardica',lv=>lv>=15?'1d12':lv>=10?'1d10':lv>=5?'1d8':'1d6',lv=>Math.max(1,SM_cha));
+    ensureScalingResource('bardic','Ispirazione Bardica',bardLv,lv=>lv>=15?'1d12':lv>=10?'1d10':lv>=5?'1d8':'1d6',lv=>Math.max(1,SM_cha));
   }
   if(isBattleMaster){
-    ensureScalingResource('superiority','Dadi Superiorità',lv=>lv>=18?'1d12':lv>=10?'1d10':'1d8',lv=>lv>=15?6:lv>=7?5:4);
+    ensureScalingResource('superiority','Dadi Superiorità',fighterLv,lv=>lv>=18?'1d12':lv>=10?'1d10':'1d8',lv=>lv>=15?6:lv>=7?5:4);
   }
 
   // Risorse
