@@ -155,6 +155,7 @@ const PAGES=[
   {id:'features',ic:'⭐',tx:'Privilegi'},
   {id:'combo',ic:'⚡',tx:'Combo'},{id:'inventory',ic:'🎒',tx:'Inventario'},{id:'personality',ic:'🎭',tx:'Personalità'},
   {id:'diario',ic:'📓',tx:'Diario'},{id:'world',ic:'🗺',tx:'Mondo'},{id:'homebrew',ic:'⚗',tx:'Homebrew'},
+  {id:'companions',ic:'🐾',tx:'Companion'},{id:'wildshape',ic:'🐺',tx:'Forma Selv.'},
   {id:'settings',ic:'⚙',tx:'Impostazioni'},
 ];
 
@@ -368,6 +369,11 @@ const DEF={
   raceFeatures:[],
   feats:[],
   selectedFeats:[],
+  showCompanions:false,
+  companions:[],
+  showWildshape:false,
+  wildshapes:[],
+  spellCategories:[],  // categorie custom per incantesimi in Combat: [{key,label,color}]
 };
 
 let C={};
@@ -387,6 +393,11 @@ function load(){try{const s=localStorage.getItem('dnd5');if(s){const d=JSON.pars
   if(!C.feats)C.feats=[];
   if(!C.selectedFeats)C.selectedFeats=[];
   if(!C.classes)C.classes=[];
+  if(C.showCompanions===undefined)C.showCompanions=false;
+  if(!C.companions)C.companions=[];
+  if(C.showWildshape===undefined)C.showWildshape=false;
+  if(!C.wildshapes)C.wildshapes=[];
+  if(!C.spellCategories)C.spellCategories=[];
   }else reset();}catch(e){reset();}
   if(C._lastPage&&PAGES.find(p=>p.id===C._lastPage))PG=C._lastPage;
 }
@@ -943,6 +954,7 @@ function showSpellModal(name,viewOnly){
         if(v){if(!(dr.du||'').includes('Conc'))dr.du='Conc. 1 min';}
         else{dr.du=(dr.du||'').replace(/Conc\.\s*/,'').trim()||'Istantanea';}
       });
+      const rituChk=mChkBox(!!dr.rituale,'Rituale',v=>{dr.rituale=v;});
       const matFieldWrap=mk('div',{style:{display:compM?'block':'none',marginTop:'4px'}});
       matFieldWrap.appendChild(TI(dr.cm||'',v=>{dr.cm=v;},'Cosa serve come componente materiale...'));
       content=DIV([
@@ -952,7 +964,7 @@ function showSpellModal(name,viewOnly){
           DIV([LBL('Scuola'),SEL(dr.sc||'',[['','—'],['Abiurazione','Abiurazione'],['Ammaliamento','Ammaliamento'],['Divinazione','Divinazione'],['Evocazione','Evocazione'],['Illusione','Illusione'],['Incantamento','Incantamento'],['Invocazione','Invocazione'],['Necromanzia','Necromanzia'],['Trasmutazione','Trasmutazione']],v=>{dr.sc=v;},{width:'100%'})]),
         ],'1fr 1fr',6),
         DIV([LBL('Tipo Azione'),SEL(dr.ca||'A',[['A','Azione'],['AB','Azione Bonus'],['R','Reazione'],['special','Speciale']],v=>{dr.ca=v;},{width:'100%'})]),
-        concChk,
+        ROW([concChk,rituChk],{gap:'16px'}),
         GRID([
           DIV([LBL('Durata'),TI(dr.du||'',v=>{dr.du=v;})]),
           DIV([LBL('Gittata'),TI(dr.ra||'',v=>{dr.ra=v;})]),
@@ -1780,63 +1792,38 @@ function pgCombat(){
   }
   p.appendChild(atkSection(C.wa,'wa','⚔ Attacchi con Armi'));
 
-  // ── Incantesimi di Attacco (da incantesimi flaggati "Attacco") ──
-  const div1=mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}});
-  p.appendChild(div1);
-  (()=>{
-    // Trucchetti attacco (sempre, basta categoria) + incantesimi preparati attacco
-    const allSpells=[
-      ...(C.cn||[]).filter(s=>s.cat==='attack'),
-      ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='attack')
-    ];
-    const sec=mk('div');
-    sec.appendChild(ROW([LBL('⚡ Incantesimi di Attacco',{color:'var(--gold)'})],{marginBottom:'4px'}));
-    if(allSpells.length===0){
-      sec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)',padding:'4px 0'}},[
-        'Nessun incantesimo di attacco preparato. Segna la categoria su un incantesimo nella pagina ✨.'
-      ]));
-    } else {
-      allSpells.forEach(s=>{
-        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let info=cu||d||{};if(cu&&!info.da&&!info.sv&&info.de){const auto=autoDetectSpellDice(info.de);info={...info,da:info.da||auto.da,daHigher:info.daHigher||auto.daHigher,sv:info.sv||auto.sv};}
-        const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--gd)'}});
-        const topRow=ROW([
-          mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
-          info.lv!==undefined?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[info.lv===0?'Trucchetto':'Lv '+info.lv]):mk('span',{},['']),
-        ]);
-        row.appendChild(topRow);
-        if(info.da||info.sv){
-          const diceBtn=BTN('⚄ Tira',(ev)=>{ev.stopPropagation();showSpellRollPopup(info.it||s.n,info.da||null,info.sv||null,info.lv||0,info.daHigher||null,info.lv===0);},'gold sm',{style:{marginTop:'6px',padding:'2px 10px',fontSize:'11px'}});
-          row.appendChild(diceBtn);
-        }
-        if(info.du)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginTop:'4px'}},['Durata: '+info.du]));
-        row.addEventListener('click',()=>showSpellModal(s.n,true));
-        sec.appendChild(row);
-      });
-    }
-    p.appendChild(sec);
-  })();
+  // ── Sezioni Incantesimi (fisse + categorie custom) — solo se hanno incantesimi dentro ──
+  if(!C.spellCategories)C.spellCategories=[];
+  const ALL_SPELL_CATS=[
+    {key:'attack',label:'Incantesimi di Attacco',icon:'⚡',color:'var(--gold)',borderColor:'var(--gd)',empty:'Nessun incantesimo di attacco preparato. Segna la categoria su un incantesimo nella pagina ✨.'},
+    {key:'buff',label:'Incantesimi di Buff e Debuff',icon:'🔮',color:'var(--purl)',borderColor:'var(--purl)',empty:'Nessun incantesimo Buff/Debuff preparato. Segna la categoria su un incantesimo nella pagina ✨.'},
+    {key:'heal',label:'Incantesimi di Cura',icon:'💚',color:'var(--greenl)',borderColor:'var(--green)',empty:'Nessun incantesimo di cura preparato. Segna la categoria su un incantesimo nella pagina ✨.'},
+    ...C.spellCategories.map(cat=>({key:cat.key,label:'Incantesimi: '+cat.label,icon:'🌀',color:cat.color||'var(--bluel)',borderColor:cat.color||'var(--blue)',empty:null})),
+  ];
 
-  // ── Incantesimi di Buff e Debuff (da incantesimi flaggati "Buff/Debuff") ──
-  p.appendChild(mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}}));
-  (()=>{
-    const buffSpells=[
-      ...(C.cn||[]).filter(s=>s.cat==='buff'),
-      ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='buff')
+  ALL_SPELL_CATS.forEach(catDef=>{
+    const catSpells=[
+      ...(C.cn||[]).filter(s=>s.cat===catDef.key),
+      ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat===catDef.key)
     ];
+    // Le categorie custom si nascondono se vuote; le tre fisse mostrano sempre un messaggio
+    if(catSpells.length===0 && catDef.empty===null)return;
+
+    p.appendChild(mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}}));
     const sec=mk('div');
-    sec.appendChild(ROW([LBL('🔮 Incantesimi di Buff e Debuff',{color:'var(--purl)'})],{marginBottom:'4px'}));
-    if(buffSpells.length===0){
-      sec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)',padding:'4px 0'}},[
-        'Nessun incantesimo Buff/Debuff preparato. Segna la categoria su un incantesimo nella pagina ✨.'
-      ]));
+    sec.appendChild(ROW([LBL(catDef.icon+' '+catDef.label,{color:catDef.color})],{marginBottom:'4px'}));
+    if(catSpells.length===0){
+      sec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)',padding:'4px 0'}},[catDef.empty]));
     } else {
-      buffSpells.forEach(s=>{
-        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let info=cu||d||{};if(cu&&!info.da&&!info.sv&&info.de){const auto=autoDetectSpellDice(info.de);info={...info,da:info.da||auto.da,daHigher:info.daHigher||auto.daHigher,sv:info.sv||auto.sv};}
-        const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--purl)'}});
+      catSpells.forEach(s=>{
+        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let info=cu||d||{};
+        if(cu&&!info.da&&!info.sv&&info.de){const auto=autoDetectSpellDice(info.de);info={...info,da:info.da||auto.da,daHigher:info.daHigher||auto.daHigher,sv:info.sv||auto.sv};}
+        const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:catDef.borderColor}});
         row.appendChild(ROW([
-          mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
+          mk('span',{style:{color:catDef.color,fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
           info.lv!==undefined?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[info.lv===0?'Trucchetto':'Lv '+info.lv]):mk('span',{},['']),
         ]));
+        if(info.rituale)row.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'10px',marginTop:'2px',display:'inline-block'}},['✦ Rituale']));
         if(info.da||info.sv){
           const diceBtn=BTN('⚄ Tira',(ev)=>{ev.stopPropagation();showSpellRollPopup(info.it||s.n,info.da||null,info.sv||null,info.lv||0,info.daHigher||null,info.lv===0);},'gold sm',{style:{marginTop:'6px',padding:'2px 10px',fontSize:'11px'}});
           row.appendChild(diceBtn);
@@ -1847,40 +1834,7 @@ function pgCombat(){
       });
     }
     p.appendChild(sec);
-  })();
-
-  // ── Cura (da incantesimi flaggati "Cura") ──
-  p.appendChild(mk('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,var(--border),transparent)',margin:'8px 0'}}));
-  (()=>{
-    const healSpells=[
-      ...(C.cn||[]).filter(s=>s.cat==='heal'),
-      ...[1,2,3,4,5,6,7,8,9].flatMap(l=>(C.sl[l]||[])).filter(s=>s.pr&&s.cat==='heal')
-    ];
-    const sec=mk('div');
-    sec.appendChild(ROW([LBL('💚 Incantesimi di Cura',{color:'var(--greenl)'})],{marginBottom:'4px'}));
-    if(healSpells.length===0){
-      sec.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',fontFamily:'var(--fb)',padding:'4px 0'}},[
-        'Nessun incantesimo di cura preparato. Segna la categoria su un incantesimo nella pagina ✨.'
-      ]));
-    } else {
-      healSpells.forEach(s=>{
-        const d=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let info=cu||d||{};if(cu&&!info.da&&!info.sv&&info.de){const auto=autoDetectSpellDice(info.de);info={...info,da:info.da||auto.da,daHigher:info.daHigher||auto.daHigher,sv:info.sv||auto.sv};}
-        const row=mk('div',{cls:'card',style:{marginTop:'6px',padding:'8px',cursor:'pointer',borderColor:'var(--green)'}});
-        row.appendChild(ROW([
-          mk('span',{style:{color:'var(--greenl)',fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[info.it||s.n]),
-          info.lv!==undefined?mk('span',{style:{color:'var(--td)',fontSize:'11px'}},[info.lv===0?'Trucchetto':'Lv '+info.lv]):mk('span',{},['']),
-        ]));
-        if(info.da||info.sv){
-          const diceBtn=BTN('⚄ Tira',(ev)=>{ev.stopPropagation();showSpellRollPopup(info.it||s.n,info.da||null,info.sv||null,info.lv||0,info.daHigher||null,info.lv===0);},'gold sm',{style:{marginTop:'6px',padding:'2px 10px',fontSize:'11px'}});
-          row.appendChild(diceBtn);
-        }
-        if(info.du)row.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginTop:'4px'}},['Durata: '+info.du]));
-        row.addEventListener('click',()=>showSpellModal(s.n,true));
-        sec.appendChild(row);
-      });
-    }
-    p.appendChild(sec);
-  })();
+  });
 
   // ── Talenti (consultazione) ──
   const selFeats=(C.selectedFeats||[]);
@@ -1979,6 +1933,32 @@ function pgCombat(){
   return p;
 }
 
+// Costruisce le opzioni categoria per gli incantesimi: fisse + custom create dall'utente
+function buildSpellCatOptions(currentVal, selectEl){
+  if(!C.spellCategories)C.spellCategories=[];
+  const fixed=[['','—'],['attack','Attacco'],['buff','Buff'],['heal','Cura']];
+  const custom=C.spellCategories.map(cat=>[cat.key,cat.label]);
+  [...fixed,...custom,['__new__','+ Nuova categoria...']].forEach(([v,lb])=>{
+    const o=mk('option',{value:v},[lb]);
+    if(currentVal===v)o.selected=true;
+    selectEl.appendChild(o);
+  });
+}
+function promptNewSpellCategory(onCreated){
+  const label=prompt('Nome della nuova categoria (es. "Controllo", "Tiro Salvezza"):');
+  if(!label||!label.trim())return null;
+  const key='custom_'+label.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_');
+  if(!C.spellCategories)C.spellCategories=[];
+  if(!C.spellCategories.find(c=>c.key===key)){
+    const colors=['var(--bluel)','var(--purl)','var(--greenl)','#e8a030','var(--rl)'];
+    const color=colors[C.spellCategories.length%colors.length];
+    C.spellCategories.push({key,label:label.trim(),color});
+  }
+  save();
+  if(onCreated)onCreated(key);
+  return key;
+}
+
 function pgSpells(){
   const spMod=sm(C[C.sca]||10);
   const p=mk('div',{cls:'page'});
@@ -1987,6 +1967,9 @@ function pgSpells(){
   // Stato ricerca incantesimi
   if(!C._spellSearch)C._spellSearch='';
   const spSearchInp=mk('input',{type:'text',id:'spell-search-inp',placeholder:'🔍 Cerca incantesimo...',value:C._spellSearch||'',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px'}});
+  const spHint=mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginBottom:'8px',lineHeight:'1.5',padding:'4px 6px',background:'rgba(201,168,76,0.06)',borderRadius:'4px',border:'1px solid rgba(201,168,76,0.15)'}},
+    ['💡 Per vedere un incantesimo in Combat servono ENTRAMBE le cose: ✓ Preparato (1° spunta) e una Categoria selezionata (Attacco/Buff/Cura/altro). I trucchetti non servono "preparati", basta la categoria.']
+  );
   spSearchInp.addEventListener('input',ev=>{
     C._spellSearch=ev.target.value;
     // Non chiamare render() — aggiorna solo i risultati
@@ -2156,6 +2139,7 @@ function pgSpells(){
 
   // Barra ricerca incantesimi
   p.appendChild(spSearchInp);
+  p.appendChild(spHint);
 
   // Trucchetti
   const filteredCn=(C.cn||[]).filter((s,_i)=>!spQ||s.n.toLowerCase().includes(spQ)||(lkS(s.n)?.it||'').toLowerCase().includes(spQ));
@@ -2166,9 +2150,16 @@ function pgSpells(){
       const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let d=cu||db;if(cu&&!d.da&&!d.sv&&d.de){const auto=autoDetectSpellDice(d.de);d={...d,da:d.da||auto.da,daHigher:d.daHigher||auto.daHigher,sv:d.sv||auto.sv};}
       const row=mk('div',{cls:'srow'});
       // Categoria per Combat (trucchetti sempre visibili, basta la categoria)
-      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'68px'}});
-      [['','—'],['attack','Attacco'],['buff','Buff'],['heal','Cura']].forEach(([v,lb])=>{const o=mk('option',{value:v},[lb]);if((s.cat||'')==v)o.selected=true;catSel.appendChild(o);});
-      catSel.addEventListener('change',ev=>{C.cn[i].cat=ev.target.value;save();});
+      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'78px'}});
+      buildSpellCatOptions(s.cat||'',catSel);
+      catSel.addEventListener('change',ev=>{
+        if(ev.target.value==='__new__'){
+          const newKey=promptNewSpellCategory();
+          if(newKey){C.cn[i].cat=newKey;render();}else{ev.target.value=s.cat||'';}
+          return;
+        }
+        C.cn[i].cat=ev.target.value;save();
+      });
       row.appendChild(catSel);
       const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted'}});
       nm.textContent=cu?.it||d?.it||s.n;
@@ -2197,9 +2188,16 @@ function pgSpells(){
       const chkEl=CHK(!!s.pr,v=>{C.sl[l][i].pr=v;save();render();});
       row.appendChild(chkEl);
       // Categoria per Combat
-      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'68px'}});
-      [['','—'],['attack','Attacco'],['buff','Buff'],['heal','Cura']].forEach(([v,lb])=>{const o=mk('option',{value:v},[lb]);if((s.cat||'')==v)o.selected=true;catSel.appendChild(o);});
-      catSel.addEventListener('change',ev=>{C.sl[l][i].cat=ev.target.value;save();});
+      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'78px'}});
+      buildSpellCatOptions(s.cat||'',catSel);
+      catSel.addEventListener('change',ev=>{
+        if(ev.target.value==='__new__'){
+          const newKey=promptNewSpellCategory();
+          if(newKey){C.sl[l][i].cat=newKey;render();}else{ev.target.value=s.cat||'';}
+          return;
+        }
+        C.sl[l][i].cat=ev.target.value;save();
+      });
       row.appendChild(catSel);
       const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted'}});
       nm.textContent=cu?.it||d?.it||s.n;
@@ -2822,6 +2820,234 @@ function pgWorld(){
   return p;
 }
 
+// ── COMPANION / FORMA SELVATICA — struttura dati condivisa ──
+function makeBlankCompanion(){
+  return{
+    name:'',creature:'',boundTo:'',size:'',align:'',weight:'',type:'',
+    str:10,dex:10,con:10,int:10,wis:10,cha:10,
+    sp:{str:false,dex:false,con:false,int:false,wis:false,cha:false},
+    bac:10,acm:[],spd:30,fly:0,swim:0,burrow:0,climb:0,
+    maxHp:0,hp:0,thp:0,hdType:'1d8',hdMax:1,hdUsed:0,
+    spAttack:0,spDC:0,
+    senses:'',languages:'',
+    resistances:[],immunities:[],vulnerabilities:[],
+    skills:'',
+    equipment:'',personality:'',appearance:'',
+    racialFeatures:[],actions:[],bonusActions:[],reactions:[],
+    weapons:[],
+  };
+}
+const DAMAGE_TYPES_C=['Acido','Freddo','Fuoco','Fulmine','Forza','Necrotici','Radianti','Psichici','Sonoro','Tuono','Veleno','Perforanti','Taglienti','Contundenti','Non magici P/T/C'];
+
+function pgCompanionGeneric(listKey, pageTitle, pageIcon){
+  const p=mk('div',{cls:'page'});
+  if(!C[listKey])C[listKey]=[];
+
+  p.appendChild(ROW([
+    mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'14px',letterSpacing:'1px'}},[pageIcon+' '+pageTitle]),
+    BTN('+ Nuovo',()=>{C[listKey].push(makeBlankCompanion());save();render();},'gold sm')
+  ],{justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}));
+
+  if(C[listKey].length===0){
+    p.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'13px',textAlign:'center',padding:'32px',fontFamily:'var(--fb)'}},
+      ['Nessun '+pageTitle.toLowerCase()+' ancora.',mk('br'),'Clicca + Nuovo per crearne uno.']
+    ));
+    return p;
+  }
+
+  C[listKey].forEach((comp,ci)=>{
+    const isOpen=comp._open!==false;
+    const S={str:sm(comp.str),dex:sm(comp.dex),con:sm(comp.con),int:sm(comp.int),wis:sm(comp.wis),cha:sm(comp.cha)};
+    const SN={str:'For',dex:'Des',con:'Cos',int:'Int',wis:'Sag',cha:'Car'};
+    const SL2={str:'FOR',dex:'DES',con:'COS',int:'INT',wis:'SAG',cha:'CAR'};
+    const pb=C.prof||2;
+    const acT=(comp.bac||10)+(comp.acm||[]).filter(m=>m.on).reduce((a,m)=>a+(Number(m.v)||0),0);
+
+    const card=mk('div',{style:{marginBottom:'10px',border:'1px solid '+(isOpen?'var(--border)':'rgba(90,62,27,0.3)'),borderRadius:'8px',overflow:'hidden',background:isOpen?'var(--card)':'transparent'}});
+
+    // Header riga collassabile
+    const hdr=mk('div',{style:{display:'flex',alignItems:'center',gap:'8px',padding:'9px 12px',cursor:'pointer',background:isOpen?'rgba(0,0,0,0.2)':'transparent'}});
+    hdr.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px',flexShrink:0}},[isOpen?'▲':'▼']));
+    const nameI=mk('input',{type:'text',value:comp.name||'',placeholder:'Nome '+pageTitle+'...',style:{flex:'1',fontFamily:'var(--ft)',fontSize:'13px',color:'var(--gl)',background:'transparent',border:'none',outline:'none',minWidth:0}});
+    nameI.addEventListener('change',ev=>{C[listKey][ci].name=ev.target.value;save();});
+    nameI.addEventListener('click',ev=>ev.stopPropagation());
+    hdr.appendChild(nameI);
+    hdr.appendChild(mk('span',{style:{color:'var(--gold)',fontSize:'11px',flexShrink:0}},['PF '+(comp.hp||0)+'/'+(comp.maxHp||0)+' · CA '+acT]));
+    const delBtn=BTN('✕',()=>{if(confirm('Eliminare '+(comp.name||pageTitle)+'?')){C[listKey].splice(ci,1);save();render();}},'ghost sm',{style:{padding:'0 4px',fontSize:'11px',flexShrink:0}});
+    delBtn.addEventListener('click',ev=>ev.stopPropagation());
+    hdr.appendChild(delBtn);
+    hdr.addEventListener('click',()=>{C[listKey][ci]._open=!isOpen;save();render();});
+    card.appendChild(hdr);
+
+    if(!isOpen){p.appendChild(card);return;}
+
+    const body=mk('div',{style:{padding:'10px 12px'}});
+
+    // Info base
+    body.appendChild(GRID([
+      DIV([LBL('Creatura'),TI(comp.creature||'',v=>{C[listKey][ci].creature=v;save();},'Tipo creatura',{fontSize:'12px'})]),
+      DIV([LBL('Legato a'),TI(comp.boundTo||'',v=>{C[listKey][ci].boundTo=v;save();},C.name||'',{fontSize:'12px'})]),
+      DIV([LBL('Taglia'),TI(comp.size||'',v=>{C[listKey][ci].size=v;save();},'Piccola',{fontSize:'12px'})]),
+    ],'1fr 1fr 1fr',4,{marginBottom:'6px'}));
+    body.appendChild(GRID([
+      DIV([LBL('Allineamento'),TI(comp.align||'',v=>{C[listKey][ci].align=v;save();},'',{fontSize:'12px'})]),
+      DIV([LBL('Peso'),TI(comp.weight||'',v=>{C[listKey][ci].weight=v;save();},'',{fontSize:'12px'})]),
+      DIV([LBL('Tipo Creatura'),TI(comp.type||'',v=>{C[listKey][ci].type=v;save();},'Costrutto, Bestia...',{fontSize:'12px'})]),
+    ],'1fr 1fr 1fr',4,{marginBottom:'10px'}));
+
+    // Caratteristiche
+    const statsGrid=GRID(['str','dex','con','int','wis','cha'].map(k=>{
+      const modDiv=mk('div',{style:{fontSize:'18px',color:'var(--gl)',fontFamily:'var(--ft)',cursor:'pointer',lineHeight:'1',textAlign:'center'}},[fm(S[k])]);
+      const inp=mk('input',{type:'number',value:String(comp[k]),style:{width:'100%',fontSize:'11px',marginTop:'2px',textAlign:'center'}});
+      inp.addEventListener('change',ev=>{C[listKey][ci][k]=Math.max(1,Math.min(30,Number(ev.target.value)||10));save();render();});
+      modDiv.addEventListener('click',()=>showRoll('1d20'+fm(S[k]),SN[k]));
+      return CARD([LBL(SN[k]),modDiv,inp],{textAlign:'center',padding:'6px'});
+    }),'repeat(3,1fr)',4,{marginBottom:'8px'});
+    body.appendChild(statsGrid);
+
+    // Tiri Salvezza
+    const svRow=mk('div',{style:{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'8px'}});
+    ['str','dex','con','int','wis','cha'].forEach(k=>{
+      const total=S[k]+((comp.sp||{})[k]?pb:0);
+      const chip=mk('div',{style:{display:'flex',alignItems:'center',gap:'3px',fontSize:'10px'}});
+      const chk2=CHK(!!(comp.sp||{})[k],v=>{C[listKey][ci].sp[k]=v;save();render();});
+      chip.appendChild(chk2);
+      chip.appendChild(mk('span',{style:{color:'var(--td)'}},[SL2[k]]));
+      const rb=BTN(fm(total),()=>showRoll('1d20'+fm(total),'TS '+SL2[k]),'gold sm',{style:{padding:'1px 6px',fontSize:'10px'}});
+      chip.appendChild(rb);
+      svRow.appendChild(chip);
+    });
+    body.appendChild(CARD([LBL('Tiri Salvezza'),svRow]));
+
+    // CA / Iniziativa / Velocità
+    body.appendChild(GRID([
+      CARD([LBL('CA'),(()=>{const e=mk('div',{style:{fontSize:'20px',color:'var(--gl)',fontFamily:'var(--ft)',textAlign:'center'}},[String(acT)]);return e;})(),NI(comp.bac||10,v=>{C[listKey][ci].bac=v;save();render();},undefined,undefined,{width:'100%',marginTop:'4px'})],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('Iniziativa'),(()=>{const e=mk('div',{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',textAlign:'center'}},[fm(S.dex)]);e.addEventListener('click',()=>showRoll('1d20'+fm(S.dex),'Iniziativa'));return e;})()],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('Vel. (m)'),NI(comp.spd||30,v=>{C[listKey][ci].spd=v;save();},undefined,undefined,{width:'100%'})],{textAlign:'center',padding:'6px'}),
+    ],'1fr 1fr 1fr',4,{marginBottom:'6px'}));
+    body.appendChild(GRID([
+      DIV([LBL('Volare (m)'),NI(comp.fly||0,v=>{C[listKey][ci].fly=v;save();},undefined,undefined,{width:'100%'})]),
+      DIV([LBL('Nuotare (m)'),NI(comp.swim||0,v=>{C[listKey][ci].swim=v;save();},undefined,undefined,{width:'100%'})]),
+      DIV([LBL('Scavare (m)'),NI(comp.burrow||0,v=>{C[listKey][ci].burrow=v;save();},undefined,undefined,{width:'100%'})]),
+      DIV([LBL('Arrampicare (m)'),NI(comp.climb||0,v=>{C[listKey][ci].climb=v;save();},undefined,undefined,{width:'100%'})]),
+    ],'1fr 1fr 1fr 1fr',4,{marginBottom:'10px'}));
+
+    // PF
+    body.appendChild(GRID([
+      CARD([LBL('PF Max'),NI(comp.maxHp||0,v=>{C[listKey][ci].maxHp=Math.max(0,v);if(C[listKey][ci].hp>C[listKey][ci].maxHp)C[listKey][ci].hp=C[listKey][ci].maxHp;save();render();},undefined,undefined,{width:'100%',fontSize:'16px',textAlign:'center'})],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('PF Attuali'),NI(comp.hp||0,v=>{C[listKey][ci].hp=Math.max(-999,Math.min(comp.maxHp||0,v));save();render();},undefined,undefined,{width:'100%',fontSize:'16px',textAlign:'center',color:(comp.hp||0)<=0?'var(--rl)':(comp.hp||0)<(comp.maxHp||0)*.5?'#e8a030':'var(--greenl)'})],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('PF Temp.'),NI(comp.thp||0,v=>{C[listKey][ci].thp=Math.max(0,v);save();},undefined,undefined,{width:'100%',fontSize:'16px',textAlign:'center',color:'var(--bluel)'})],{textAlign:'center',padding:'6px'}),
+    ],'1fr 1fr 1fr',4,{marginBottom:'6px'}));
+
+    // Dadi vita
+    const hdAvail=Math.max(0,(comp.hdMax||1)-(comp.hdUsed||0));
+    body.appendChild(CARD([
+      ROW([
+        LBL('Dadi Vita',{marginBottom:'0'}),
+        mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px'}},[String(hdAvail)+'/'+String(comp.hdMax||1)]),
+        SEL(comp.hdType||'1d8',[['1d6','1d6'],['1d8','1d8'],['1d10','1d10'],['1d12','1d12']],v=>{C[listKey][ci].hdType=v;save();},{fontSize:'11px',width:'60px'}),
+        NI(comp.hdMax||1,v=>{C[listKey][ci].hdMax=Math.max(1,v);save();render();},undefined,undefined,{width:'42px'}),
+      ],{gap:'6px',alignItems:'center'}),
+      BTN('Usa Dado',()=>{
+        if((comp.hdUsed||0)>=(comp.hdMax||1))return;
+        const cm=sm(comp.con);const r=roll((comp.hdType||'1d8')+(cm>=0?'+'+cm:String(cm)));
+        C[listKey][ci].hp=Math.min(comp.maxHp||0,(comp.hp||0)+Math.max(1,r.t));
+        C[listKey][ci].hdUsed=(comp.hdUsed||0)+1;save();render();
+      },'gold sm',{style:{marginTop:'6px'}})
+    ]));
+
+    // Attacco Incantesimi / CD / Percezione Passiva
+    body.appendChild(GRID([
+      DIV([LBL('Attacco Incant.'),NI(comp.spAttack||0,v=>{C[listKey][ci].spAttack=v;save();},undefined,undefined,{width:'100%',textAlign:'center'})]),
+      DIV([LBL('CD Incant.'),NI(comp.spDC||0,v=>{C[listKey][ci].spDC=v;save();},undefined,undefined,{width:'100%',textAlign:'center'})]),
+      DIV([LBL('Perc. Passiva'),mk('div',{style:{textAlign:'center',color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'15px',paddingTop:'3px'}},[String(10+S.wis)])]),
+    ],'1fr 1fr 1fr',4,{marginTop:'8px',marginBottom:'8px'}));
+
+    // Resistenze/Immunità/Vulnerabilità
+    const resSection=CARD([LBL('Resistenze, Immunità, Vulnerabilità')]);
+    [
+      {key:'resistances',label:'Resistenze',color:'var(--greenl)',bg:'rgba(42,107,58,0.15)'},
+      {key:'immunities',label:'Immunità',color:'var(--gold)',bg:'rgba(201,168,76,0.1)'},
+      {key:'vulnerabilities',label:'Vulnerabilità',color:'var(--rl)',bg:'rgba(139,32,32,0.15)'},
+    ].forEach(({key,label,color,bg})=>{
+      const sec=mk('div',{style:{marginTop:'6px'}});
+      sec.appendChild(mk('div',{style:{color:color,fontSize:'9px',fontFamily:'var(--ft)',letterSpacing:'1px',marginBottom:'3px'}},[label.toUpperCase()]));
+      const chips=mk('div',{style:{display:'flex',flexWrap:'wrap',gap:'3px'}});
+      (comp[key]||[]).forEach((dt,di)=>{
+        const chip=mk('span',{style:{fontSize:'10px',padding:'1px 6px',borderRadius:'7px',border:'1px solid '+color,color:color,background:bg,display:'inline-flex',alignItems:'center',gap:'3px',cursor:'pointer'}});
+        chip.appendChild(mk('span',null,[dt]));
+        const x=mk('span',{style:{fontSize:'8px',opacity:'0.7'}},['✕']);
+        x.addEventListener('click',()=>{C[listKey][ci][key].splice(di,1);save();render();});
+        chip.appendChild(x);
+        chips.appendChild(chip);
+      });
+      const addSel=mk('select',{style:{fontSize:'10px',background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'4px',padding:'1px 3px'}});
+      addSel.appendChild(mk('option',{value:''},['+']));
+      DAMAGE_TYPES_C.filter(d=>!(comp[key]||[]).includes(d)).forEach(d=>{addSel.appendChild(mk('option',{value:d},[d]));});
+      addSel.addEventListener('change',ev=>{if(!ev.target.value)return;if(!C[listKey][ci][key])C[listKey][ci][key]=[];C[listKey][ci][key].push(ev.target.value);save();render();});
+      chips.appendChild(addSel);
+      sec.appendChild(chips);
+      resSection.appendChild(sec);
+    });
+    body.appendChild(resSection);
+
+    // Sensi e Linguaggi
+    body.appendChild(GRID([
+      DIV([LBL('Sensi'),TA(comp.senses||'',v=>{C[listKey][ci].senses=v;},'Scurovisione 18m, Percezione cieca...')]),
+      DIV([LBL('Linguaggi'),TA(comp.languages||'',v=>{C[listKey][ci].languages=v;},'Comprende il Comune...')]),
+    ],'1fr 1fr',6,{marginTop:'8px'}));
+
+    // Abilità/Competenze
+    body.appendChild(DIV([LBL('Abilità & Competenze'),TA(comp.skills||'',v=>{C[listKey][ci].skills=v;},'Percezione +4, Furtività +6...')],{marginTop:'8px'}));
+
+    // Attacchi/Armi
+    const wpSec=mk('div',{style:{marginTop:'8px'}});
+    wpSec.appendChild(ROW([LBL('Attacchi'),BTN('+ Attacco',()=>{if(!C[listKey][ci].weapons)C[listKey][ci].weapons=[];C[listKey][ci].weapons.push({n:'',atk:0,dmg:'1d6',type:''});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}));
+    (comp.weapons||[]).forEach((w,wi)=>{
+      wpSec.appendChild(GRID([
+        TI(w.n||'',v=>{C[listKey][ci].weapons[wi].n=v;save();},'Nome',{fontSize:'11px'}),
+        NI(w.atk||0,v=>{C[listKey][ci].weapons[wi].atk=v;save();},undefined,undefined,{width:'100%'}),
+        TI(w.dmg||'',v=>{C[listKey][ci].weapons[wi].dmg=v;save();},'1d6',{fontSize:'11px'}),
+        TI(w.type||'',v=>{C[listKey][ci].weapons[wi].type=v;save();},'Tipo',{fontSize:'11px'}),
+      ],'2fr 1fr 1fr 1fr',4,{marginTop:'4px'}));
+    });
+    body.appendChild(wpSec);
+
+    // Sezioni testo libero: Tratti Razziali, Azione, Azione Bonus, Reazione
+    [
+      ['racialFeatures','🌿 Tratti Razziali'],
+      ['actions','⚔ Azione'],
+      ['bonusActions','⚡ Azione Bonus'],
+      ['reactions','🛡 Reazione'],
+    ].forEach(([fKey,fLabel])=>{
+      const fSec=mk('div',{style:{marginTop:'8px'}});
+      fSec.appendChild(ROW([LBL(fLabel),BTN('+',()=>{if(!C[listKey][ci][fKey])C[listKey][ci][fKey]=[];C[listKey][ci][fKey].push({name:'',desc:''});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}));
+      (comp[fKey]||[]).forEach((feat,fi)=>{
+        const featCard2=mk('div',{style:{marginTop:'4px',border:'1px solid rgba(90,62,27,0.3)',borderRadius:'5px',padding:'5px'}});
+        featCard2.appendChild(ROW([TI(feat.name||'',v=>{C[listKey][ci][fKey][fi].name=v;save();},'Nome',{flex:'1',fontFamily:'var(--ft)',fontSize:'11px'}),BTN('✕',()=>{C[listKey][ci][fKey].splice(fi,1);save();render();},'ghost sm')]));
+        const ta2=TA(feat.desc||'',v=>{C[listKey][ci][fKey][fi].desc=v;},'Descrizione');
+        ta2.style.marginTop='3px';ta2.style.fontSize='11px';
+        featCard2.appendChild(ta2);
+        fSec.appendChild(featCard2);
+      });
+      body.appendChild(fSec);
+    });
+
+    // Equipaggiamento, Personalità, Aspetto
+    body.appendChild(DIV([LBL('Equipaggiamento'),TA(comp.equipment||'',v=>{C[listKey][ci].equipment=v;})],{marginTop:'8px'}));
+    body.appendChild(DIV([LBL('Personalità'),TA(comp.personality||'',v=>{C[listKey][ci].personality=v;})],{marginTop:'8px'}));
+    body.appendChild(DIV([LBL('Aspetto'),TA(comp.appearance||'',v=>{C[listKey][ci].appearance=v;})],{marginTop:'8px'}));
+
+    card.appendChild(body);
+    p.appendChild(card);
+  });
+
+  return p;
+}
+
+function pgCompanions(){ return pgCompanionGeneric('companions','Companion','🐾'); }
+function pgWildshape(){ return pgCompanionGeneric('wildshapes','Forma Selvatica','🐺'); }
+
 function pgHomebrew(){
   const p=mk('div',{cls:'page'});
   const hdr=ROW([mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px'}},['⚗ Sezioni Personalizzate']),BTN('+ Sezione',()=>{C.cs.push({t:'Nuova Sezione',c:''});save();render();},'gold sm')],{justifyContent:'space-between',alignItems:'center'});
@@ -3266,6 +3492,16 @@ function pgSettings(){
   });
   p.appendChild(xpCard);
   p.appendChild(card);
+
+  // ── Companion / Forma Selvatica ──
+  const compCard=CARD([
+    LBL('🐾 Companion & Forma Selvatica'),
+    mk('div',{style:{color:'var(--tk)',fontSize:'11px',marginBottom:'8px',lineHeight:'1.5'}},['Attiva queste pagine se il tuo personaggio ha un companion (es. Steel Defender, familiare) o può trasformarsi (es. Forma Selvatica del Druido).']),
+    ROW([LBL('Companion',{marginBottom:'0'}),CHK(!!C.showCompanions,v=>{C.showCompanions=v;save();render();},'Mostra pagina')],{justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}),
+    ROW([LBL('Forma Selvatica',{marginBottom:'0'}),CHK(!!C.showWildshape,v=>{C.showWildshape=v;save();render();},'Mostra pagina')],{justifyContent:'space-between',alignItems:'center'}),
+  ]);
+  p.appendChild(compCard);
+
   return p;
 }
 function updateHdr(){
@@ -3331,7 +3567,12 @@ function renderNav(){
   const nav=document.getElementById('nav-inner');
   nav.innerHTML='';
   const hiddenPages=C.hiddenPages||[];
-  PAGES.filter(pg=>pg.id==='settings'||pg.id==='features'||!hiddenPages.includes(pg.id)).forEach(pg=>{
+  PAGES.filter(pg=>{
+    if(pg.id==='settings'||pg.id==='features')return true;
+    if(pg.id==='companions')return !!C.showCompanions;
+    if(pg.id==='wildshape')return !!C.showWildshape;
+    return !hiddenPages.includes(pg.id);
+  }).forEach(pg=>{
     const b=mk('button',{cls:'nb'+(PG===pg.id?' on':'')});
     b.appendChild(mk('span',{cls:'ic'},[pg.ic]));
     b.appendChild(mk('span',{cls:'tx'},[pg.tx]));
@@ -3371,6 +3612,8 @@ function render(){
     case 'world':pg=pgWorld();break;
     case 'features':pg=pgFeatures();break;
     case 'homebrew':pg=pgHomebrew();break;
+    case 'companions':pg=pgCompanions();break;
+    case 'wildshape':pg=pgWildshape();break;
     case 'settings':pg=pgSettings();break;
     default:pg=pgMain();
   }
