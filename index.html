@@ -349,6 +349,8 @@ const DEF={
   dkv:0,lang:"",wprof:"",aprof:"",tprof:"",
   wa:[],ma:[],sca:"int",
   ss:{1:{m:0,u:0},2:{m:0,u:0},3:{m:0,u:0},4:{m:0,u:0},5:{m:0,u:0},6:{m:0,u:0},7:{m:0,u:0},8:{m:0,u:0},9:{m:0,u:0}},
+  pactMagic:{lv:1,m:0,u:0}, // Slot Patto Warlock — livello, massimo, usati (ricarica a Riposo Breve)
+  showPactMagic:false,
   showSlotsInCombat:false,
   cn:[],sl:{1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[],9:[]},
   res:[],ins:0,maxIns:1,ds:0,df:0,te:[],
@@ -402,6 +404,8 @@ function load(){try{const s=localStorage.getItem('dnd5');if(s){const d=JSON.pars
   if(!C.spellCategories)C.spellCategories=[];
   if(!C.baseEdition)C.baseEdition=C.spellEdition||'2014';
   if(!C.spellEdition)C.spellEdition=C.baseEdition||'2014';
+  if(!C.pactMagic)C.pactMagic={lv:1,m:0,u:0};
+  if(C.showPactMagic===undefined)C.showPactMagic=false;
   }else reset();}catch(e){reset();}
   if(C._lastPage&&PAGES.find(p=>p.id===C._lastPage))PG=C._lastPage;
 }
@@ -442,6 +446,21 @@ function resetChar(){reset();}
 // ── HELPERS ──
 function sm(s){return Math.floor(((s||10)-10)/2);}
 function profByLevel(lv){return lv>=17?6:lv>=13?5:lv>=9?4:lv>=5?3:2;}
+// Tabella ufficiale Slot Patto (Pact Magic) del Warlock — uguale 2014/2024
+function pactMagicTable(warlockLv){
+  if(warlockLv<1)return{m:0,lv:0};
+  if(warlockLv===1)return{m:1,lv:1};
+  if(warlockLv<=10)return{m:2,lv:Math.ceil(warlockLv/2)};
+  if(warlockLv<=16)return{m:3,lv:5};
+  return{m:4,lv:5};
+}
+function getWarlockLevel(){
+  if(C.classes&&C.classes.length>0){
+    const wl=C.classes.find(cl=>cl.name==='Warlock');
+    return wl?Number(wl.lv)||0:0;
+  }
+  return (C.cls||'').toLowerCase()==='warlock'?(C.lv||0):0;
+}
 function fm(n){return n>=0?'+'+n:''+n;}
 // Recupera le risorse che si ricaricano con il tipo di riposo specificato ('short' o 'long')
 function rechargeResources(restType){
@@ -1332,14 +1351,21 @@ function pgMain(){
   ],{alignItems:'flex-start'})]);
   p.appendChild(caCard);
 
-  // Init / Passiva / Darkvision
+  // Init / Passive / Darkvision
   const initGrid=GRID([
     CARD([LBL('Iniziativa'),DIV([fm(S.dex)],{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',textAlign:'center'}})],{textAlign:'center',padding:'8px'}),
-    CARD([LBL('Perc. Passiva'),DIV([String(10+skB('percezione'))],{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',textAlign:'center'}})],{textAlign:'center',padding:'8px'}),
     CARD([LBL('Scurovisione'),(()=>{const i=mk('input',{type:'text',value:String(C.dkv||0),style:{width:'100%',textAlign:'center'}});i.addEventListener('change',ev=>{C.dkv=Number(ev.target.value)||0;save();});return i;})()],{textAlign:'center',padding:'8px'}),
-  ],'1fr 1fr 1fr',6);
+  ],'1fr 1fr',6);
   initGrid.children[0].querySelector('div div').addEventListener('click',()=>showRoll('1d20'+fm(S.dex),'Iniziativa'));
   p.appendChild(initGrid);
+
+  // Abilità Passive
+  const passiveGrid=GRID([
+    CARD([LBL('Perc. Passiva'),DIV([String(10+skB('percezione'))],{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',textAlign:'center'}})],{textAlign:'center',padding:'6px'}),
+    CARD([LBL('Intuiz. Passiva'),DIV([String(10+skB('intuizione'))],{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',textAlign:'center'}})],{textAlign:'center',padding:'6px'}),
+    CARD([LBL('Indag. Passivo'),DIV([String(10+skB('indagare'))],{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',textAlign:'center'}})],{textAlign:'center',padding:'6px'}),
+  ],'1fr 1fr 1fr',6,{marginTop:'8px'});
+  p.appendChild(passiveGrid);
 
   // Ispirazione — solo input, niente spinner
   const insRow=ROW([LBL('Ispirazione',{marginBottom:'0'}),
@@ -1416,6 +1442,7 @@ function pgMain(){
         C.classes.forEach((_,ci)=>{const toR=Math.ceil((Number(C.classes[ci].lv)||1)/2);C.classes[ci].hdUsed=Math.max(0,(Number(C.classes[ci].hdUsed)||0)-toR);});
       } else {C.hdUsed=Math.max(0,(C.hdUsed||0)-Math.ceil((C.lv||1)/2));}
       rechargeResources('short');
+      if(C.pactMagic)C.pactMagic.u=0;
       save();render();
     },'sm',{style:{flex:'1',borderColor:'var(--bluel)',color:'var(--bluel)'}}),
     BTN('Riposo Lungo',()=>{
@@ -1426,10 +1453,35 @@ function pgMain(){
       for(let l=1;l<=9;l++){if(C.ss[l])C.ss[l].u=0;}
       C.exhaustion=Math.max(0,(C.exhaustion||0)-1);
       rechargeResources('long');
+      if(C.pactMagic)C.pactMagic.u=0;
       save();render();
     },'sm',{style:{flex:'1',borderColor:'var(--greenl)',color:'var(--greenl)'}})
   ],{gap:'6px',marginTop:'8px',flexWrap:'wrap'}));
   p.appendChild(hdCard);
+
+  // ── Slot Patto (Warlock — Pact Magic) ──
+  const warlockLv=getWarlockLevel();
+  if(warlockLv>0 && !C.showPactMagic){C.showPactMagic=true;save();}
+  if(C.showPactMagic && warlockLv>0){
+    const pactTable=pactMagicTable(warlockLv);
+    if(!C.pactMagic)C.pactMagic={lv:1,m:0,u:0};
+    C.pactMagic.m=pactTable.m;
+    C.pactMagic.lv=pactTable.lv;
+    if(C.pactMagic.u>C.pactMagic.m)C.pactMagic.u=C.pactMagic.m;
+    const pactAvail=Math.max(0,C.pactMagic.m-C.pactMagic.u);
+    const pactCard=CARD([
+      ROW([
+        LBL('🔮 Slot Patto (Warlock)',{marginBottom:'0'}),
+        mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'13px'}},[pactAvail+'/'+C.pactMagic.m+' · Liv. '+C.pactMagic.lv]),
+      ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}),
+      mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginBottom:'6px'}},['Pool separato dagli slot normali. Si ricarica con il Riposo Breve.']),
+      ROW([
+        BTN('Usa Slot',()=>{if(C.pactMagic.u<C.pactMagic.m){C.pactMagic.u++;save();render();}},'gold sm',{style:{flex:'1'}}),
+        BTN('↺ Recupera',()=>{if(C.pactMagic.u>0){C.pactMagic.u--;save();render();}},'sm',{style:{flex:'1',borderColor:'var(--bluel)',color:'var(--bluel)'}}),
+      ],{gap:'6px'})
+    ]);
+    p.appendChild(pactCard);
+  }
 
   // Esaurimento
   const exLevels2014=[
@@ -1474,9 +1526,34 @@ function pgMain(){
   if(exBtns[1]){exBtns[1].className='sm'+(exEd==='2024'?' gold':'');exBtns[1].addEventListener('click',()=>{C.exhaustionEdition='2024';save();render();});}
   p.appendChild(exCard);
 
+  // ── Auto-gestione risorse con dado scalabile (Ispirazione Bardica, Dadi Superiorità) ──
+  function ensureScalingResource(key, name, dieByLevel, maxByLevel){
+    if(!C.res)C.res=[];
+    const die=dieByLevel(C.lv||1);
+    let r=C.res.find(rr=>rr._scalingKey===key);
+    if(!r){
+      const initialMax=maxByLevel?maxByLevel(C.lv||1):1;
+      r={n:name,max:initialMax,cur:initialMax,recharge:'long',die:die,_scalingKey:key,auto:true};
+      C.res.push(r);
+    } else {
+      r.die=die; // aggiorna il dado in base al livello corrente
+      if(!r.n)r.n=name;
+    }
+  }
+  const SM_cha=sm(C.cha);
+  const isBardo=(C.classes&&C.classes.length>0)?C.classes.some(cl=>cl.name==='Bardo'):(C.cls||'').toLowerCase()==='bardo';
+  const isBattleMaster=((C.classes&&C.classes.length>0)?C.classes.some(cl=>cl.name==='Guerriero'):(C.cls||'').toLowerCase()==='guerriero')
+    && ((C.sub||'').toLowerCase().includes('battle master')||(C.sub||'').toLowerCase().includes('maestro di battaglia')||(C.sub||'').toLowerCase().includes('combattimento'));
+  if(isBardo){
+    ensureScalingResource('bardic','Ispirazione Bardica',lv=>lv>=15?'1d12':lv>=10?'1d10':lv>=5?'1d8':'1d6',lv=>Math.max(1,SM_cha));
+  }
+  if(isBattleMaster){
+    ensureScalingResource('superiority','Dadi Superiorità',lv=>lv>=18?'1d12':lv>=10?'1d10':'1d8',lv=>lv>=15?6:lv>=7?5:4);
+  }
+
   // Risorse
   const resCard=CARD([
-    ROW([LBL('Risorse'),BTN('+ Risorsa',()=>{C.res.push({n:'',max:1,cur:1,recharge:'long'});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}),
+    ROW([LBL('Risorse'),BTN('+ Risorsa',()=>{C.res.push({n:'',max:1,cur:1,recharge:'long',die:''});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}),
     ...(C.res||[]).map((r,i)=>mk('div',{style:{marginTop:'6px',display:'flex',flexDirection:'column',gap:'3px'}},[
       ROW([
         TI(r.n||'',v=>{C.res[i].n=v;save();},'Channel Divinity...',{flex:'1',fontSize:'12px'}),
@@ -1489,8 +1566,16 @@ function pgMain(){
       ]),
       ROW([
         mk('span',{style:{color:'var(--tk)',fontSize:'10px',flexShrink:0}},['Ricarica:']),
-        SEL(r.recharge||'long',[['long','Riposo Lungo'],['short','Riposo Breve'],['none','Manuale']],v=>{C.res[i].recharge=v;save();},{fontSize:'10px',width:'120px'})
-      ])
+        SEL(r.recharge||'long',[['long','Riposo Lungo'],['short','Riposo Breve'],['none','Manuale']],v=>{C.res[i].recharge=v;save();},{fontSize:'10px',width:'105px'}),
+        r.auto?mk('span',{style:{color:'var(--bluel)',fontSize:'9px',marginLeft:'2px'}},['🤖 Auto']):mk('span',{},['']),
+      ]),
+      ROW([
+        mk('span',{style:{color:'var(--tk)',fontSize:'10px',flexShrink:0}},['Dado:']),
+        r.auto
+          ? mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'12px'}},[r.die||'—'])
+          : TI(r.die||'',v=>{C.res[i].die=v;save();},'es. 1d6',{width:'56px',fontSize:'11px'}),
+        (r.die||r.auto)?BTN('⚄ Tira',()=>showRoll(r.die||'1d6',r.n||'Risorsa'),'gold sm',{style:{padding:'1px 8px',fontSize:'10px'}}):mk('span',{},['']),
+      ],{alignItems:'center'})
     ]))
   ]);
   p.appendChild(resCard);
@@ -1674,6 +1759,7 @@ function pgCombat(){
       for(let l=1;l<=9;l++){if(C.ss[l])C.ss[l].u=0;}
       C.exhaustion=Math.max(0,(C.exhaustion||0)-1);
       rechargeResources('long');
+      if(C.pactMagic)C.pactMagic.u=0;
       C.turnActions={a:false,ab:false,r:false,m:false};
       save();render();
     },'sm',{style:{width:'100%',marginTop:'6px',borderColor:'var(--greenl)',color:'var(--greenl)',background:'rgba(42,107,58,0.1)'}});
@@ -1709,6 +1795,12 @@ function pgCombat(){
     mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Perc. Passiva'),mk('div',{style:{fontSize:'20px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(10+skB('percezione'))])]),
   ],'1fr 1fr 1fr',6);
   p.appendChild(CARD([infoRow]));
+
+  const passiveRow2=GRID([
+    mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Intuiz. Passiva'),mk('div',{style:{fontSize:'18px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(10+skB('intuizione'))])]),
+    mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Indag. Passivo'),mk('div',{style:{fontSize:'18px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(10+skB('indagare'))])]),
+  ],'1fr 1fr',6,{marginTop:'6px'});
+  p.appendChild(CARD([passiveRow2]));
 
   // ── Slot Incantesimo in Combat (on/off per personaggio) ──
   const slotToggleRow=ROW([
