@@ -603,6 +603,7 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
       p.appendChild(mk('div',{style:{color:'var(--rl)',fontSize:'12px',marginBottom:'8px'}},['⚠ Nessuno slot disponibile di livello '+minLv+' o superiore.']));
       const okBtn=BTN('Chiudi',()=>{p.style.display='none';},'ghost',{style:{width:'100%'}});
       p.appendChild(okBtn);
+      addRpopCloseBtn(p);
       p.style.display='block';
       clearTimeout(rpt);
       return;
@@ -669,6 +670,7 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
     renderSpellRollResult(spellName, finalDice, saveAttr, spCD, pb, scaMod, isCantrip?null:chosenLv);
   },'gold',{style:{width:'100%'}});
   p.appendChild(confirmBtn);
+  addRpopCloseBtn(p);
 
   p.style.display='block';
   clearTimeout(rpt); // Non auto-chiude finché l'utente non sceglie
