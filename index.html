@@ -365,7 +365,8 @@ const DEF={
   notes:[],
   conditions:[],
   conditionEdition:'2014',
-  spellEdition:'2014',
+  baseEdition:'2014',  // edizione globale (talenti, companion, bestiario, condizioni)
+  spellEdition:'2014', // edizione di ricerca incantesimi (locale alla pagina)
   classFeatures:[],
   raceFeatures:[],
   feats:[],
@@ -399,6 +400,8 @@ function load(){try{const s=localStorage.getItem('dnd5');if(s){const d=JSON.pars
   if(C.showWildshape===undefined)C.showWildshape=false;
   if(!C.wildshapes)C.wildshapes=[];
   if(!C.spellCategories)C.spellCategories=[];
+  if(!C.baseEdition)C.baseEdition=C.spellEdition||'2014';
+  if(!C.spellEdition)C.spellEdition=C.baseEdition||'2014';
   }else reset();}catch(e){reset();}
   if(C._lastPage&&PAGES.find(p=>p.id===C._lastPage))PG=C._lastPage;
 }
@@ -2865,7 +2868,7 @@ function crToNumber(cr){
 function getWildshapeLimits(){
   const lv=C.lv||1;
   const isMoon=(C.sub||'').toLowerCase().includes('luna')||(C.sub||'').toLowerCase().includes('moon');
-  const ed=C.spellEdition||'2014';
+  const ed=C.baseEdition||'2014';
   let maxCR=0,canSwim=false,canFly=false;
   if(ed==='2024'){
     if(isMoon){
@@ -3678,6 +3681,21 @@ function pgSettings(){
   });
   p.appendChild(xpCard);
   p.appendChild(card);
+
+  // ── Edizione Regole (globale) ──
+  if(!C.baseEdition)C.baseEdition='2014';
+  const editionCard=CARD([
+    LBL('📖 Edizione Regole'),
+    mk('div',{style:{color:'var(--tk)',fontSize:'11px',marginBottom:'8px',lineHeight:'1.5'}},['Usata per Bestiario Forma Selvatica e altri contenuti. La ricerca incantesimi nella pagina ✨ ha un selettore separato e può usare un\'edizione diversa.']),
+    ROW([
+      LBL('Edizione',{marginBottom:'0'}),
+      ROW([
+        BTN('2014',()=>{C.baseEdition='2014';save();render();},C.baseEdition==='2014'?'gold sm':'ghost sm'),
+        BTN('2024',()=>{C.baseEdition='2024';save();render();},C.baseEdition==='2024'?'gold sm':'ghost sm'),
+      ],{gap:'6px'})
+    ],{justifyContent:'space-between',alignItems:'center'}),
+  ]);
+  p.appendChild(editionCard);
 
   // ── Companion / Forma Selvatica ──
   const compCard=CARD([
