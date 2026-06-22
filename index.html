@@ -546,12 +546,26 @@ function showAttackRoll(atk, isSpell){
   const extra=Number(atk.ex)||0;
   const hitBonus=statMod+(hasPr?pb:0)+extra;
 
-  // Tiro per colpire
-  const hitRoll=roll('1d20');
-  const hitD20=hitRoll.r[0];
-  const isCrit=hitD20===20;
-  const isFumble=hitD20===1;
-  const hitTotal=hitD20+hitBonus;
+  // Edizione e ispirazione
+  const _ed=C.baseEdition||'2014';
+  const _hasIns=(C.ins||0)>0;
+
+  // 2014: ispirazione = vantaggio immediato sui dadi prima del tiro
+  let hitD20, hitTotal, isCrit, isFumble;
+  if(_hasIns && _ed==='2014'){
+    const r1=Math.floor(Math.random()*20)+1;
+    const r2=Math.floor(Math.random()*20)+1;
+    hitD20=Math.max(r1,r2);
+    C.ins=Math.max(0,(C.ins||0)-1);save();
+    isCrit=hitD20===20;isFumble=hitD20===1;
+    hitTotal=hitD20+hitBonus;
+    // Nota sul vantaggio: la aggiungiamo dopo nel breakdown
+  } else {
+    const hitRoll=roll('1d20');
+    hitD20=hitRoll.r[0];
+    isCrit=hitD20===20;isFumble=hitD20===1;
+    hitTotal=hitD20+hitBonus;
+  }
 
   // Formula danni
   const dmgStatKey=atk.dmgStat||atk.stat||'str';
@@ -591,6 +605,7 @@ function showAttackRoll(atk, isSpell){
   hitCol.appendChild(mk('div',{style:{color:isCrit?'var(--gl)':isFumble?'var(--rl)':'var(--text)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(hitTotal)]));
   // Breakdown
   let hitBreak='d20('+hitD20+')';
+  if(_hasIns && _ed==='2014')hitBreak=' Vantaggio ♦ d20('+hitD20+')';
   if(statMod!==0)hitBreak+=(statMod>0?'+':'')+statMod+'('+statKey.toUpperCase()+')';
   if(hasPr)hitBreak+=(pb>0?'+':'')+pb+'(comp)';
   if(extra!==0)hitBreak+=(extra>0?'+':'')+extra;
@@ -614,6 +629,22 @@ function showAttackRoll(atk, isSpell){
   }
   row.appendChild(dmgCol);
   p.appendChild(row);
+
+  // ── Ispirazione 2024: offri ritiro dopo aver visto il d20 ──
+  if(!isFumble && !isCrit && (C.ins||0)>0 && (C.baseEdition||'2014')==='2024'){
+    const insBtn=BTN('✧ Usa Ispirazione Eroica — Ritira il d20',()=>{
+      C.ins=Math.max(0,(C.ins||0)-1);save();
+      const r2=Math.floor(Math.random()*20)+1;
+      const newTotal=r2+hitBonus;
+      const newCrit=r2===20;const newFumble=r2===1;
+      // Aggiorna i valori mostrati inline
+      hitCol.querySelector('div:nth-child(2)').textContent=String(newTotal);
+      hitCol.querySelector('div:nth-child(2)').style.color=newCrit?'var(--gl)':newFumble?'var(--rl)':'var(--text)';
+      hitCol.querySelector('div:nth-child(3)').textContent='d20('+r2+')'+(statMod!==0?(statMod>0?'+':'')+statMod+'('+statKey.toUpperCase()+')':'')+(hasPr?(pb>0?'+':'')+pb+'(comp)':'')+(extra!==0?(extra>0?'+':'')+extra:'')+' ← Ritiro';
+      insBtn.replaceWith(mk('div',{style:{color:'var(--gold)',fontSize:'10px',textAlign:'center',marginTop:'4px'}},['✦ Ispirazione usata — '+r2+' → totale '+newTotal]));
+    },'gold sm',{style:{width:'100%',marginTop:'6px',fontSize:'11px'}});
+    p.appendChild(insBtn);
+  }
 
   // ── Sneak Attack (Ladro) — try/catch per sicurezza ──
   try {
@@ -1035,15 +1066,46 @@ function STATSEL_DMG(val,cb){
 // ── ROLL POPUP ──
 let rpt=null;
 function showRoll(formula,label){
-  const r=roll(formula);
+  const ed=C.baseEdition||'2014';
+  const hasIns=(C.ins||0)>0;
+  const is1d20=formula.startsWith('1d20');
+
+  // 2014: ispirazione = vantaggio immediato (solo su 1d20)
+  let r, usedAdv=false;
+  if(is1d20 && hasIns && ed==='2014'){
+    const r1=roll(formula);const r2=roll(formula);
+    r=r1.t>=r2.t?r1:r2;
+    C.ins=Math.max(0,(C.ins||0)-1);save();
+    usedAdv=true;
+  } else {
+    r=roll(formula);
+  }
+
   const p=document.getElementById('rpop');
   p.innerHTML='';
-  p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px'}},[label]));
-  p.appendChild(mk('div',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'26px'}},[String(r.t)]));
-  p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px'}},[r.f+' → ['+r.r.join(',')+']']));
+  p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},[label+(usedAdv?' ♦ Vantaggio':'')]));
+  const totEl=mk('div',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'26px',textAlign:'center'}},[String(r.t)]);
+  p.appendChild(totEl);
+  p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',textAlign:'center'}},[r.f+' → ['+r.r.join(',')+']']));
+
+  // 2024: offri Ispirazione Eroica dopo aver visto il risultato (solo su 1d20)
+  if(is1d20 && hasIns && ed==='2024' && !usedAdv){
+    const insBtn=BTN('✧ Usa Ispirazione Eroica — Ritira',()=>{
+      C.ins=Math.max(0,(C.ins||0)-1);save();
+      const r2=roll(formula);
+      totEl.textContent=String(r2.t);
+      p.querySelector('div:nth-child(3)').textContent=r2.f+' → ['+r2.r.join(',')+'] ← Ritiro';
+      insBtn.replaceWith(mk('div',{style:{color:'var(--gold)',fontSize:'10px',textAlign:'center',marginTop:'4px'}},
+        ['❆ Ispirazione usata — nuovo risultato: '+r2.t]));
+    },'gold sm',{style:{width:'100%',marginTop:'6px',fontSize:'11px'}});
+    p.appendChild(insBtn);
+  }
+
   addRpopCloseBtn(p);
   p.style.display='block';
-  clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',3000);
+  // Timer più lungo se c'è il pulsante ispirazione, altrimenti breve
+  const timeout=(is1d20 && hasIns && ed==='2024')?10000:3000;
+  clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',timeout);
 }
 
 // ── MODAL ──
@@ -1908,6 +1970,80 @@ function pgMain(){
   ]);
   p.appendChild(resCard);
 
+  // ── Flexible Casting (Stregone) ──
+  if(getClassLevel('Stregone')>0){
+    const sorcRes=C.res&&C.res.find(r=>r._scalingKey==='sorcery');
+    const sorcPts=sorcRes?Math.max(0,sorcRes.cur||0):0;
+    const sorcMax=sorcRes?sorcRes.max||0:0;
+
+    // Costo slot in punti (identico 2014/2024)
+    const slotCost={1:2,2:3,3:5,4:6,5:7};
+    // Punti ottenuti consumando uno slot
+    const slotGain={1:2,2:3,3:5,4:6,5:7};
+
+    const fcCard=CARD([
+      ROW([
+        mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'11px',letterSpacing:'1px'}},['✦ FLEXIBLE CASTING']),
+        mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'12px'}},[sorcPts+'/'+sorcMax+' pt']),
+      ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}),
+
+      // Slot → Punti
+      mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'4px'}},['Converti slot in punti:']),
+      mk('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'8px'}},
+        [1,2,3,4,5].map(lv=>{
+          const s=C.ss[lv]||{m:0,u:0};
+          const avail=Math.max(0,s.m-s.u);
+          const gain=slotGain[lv];
+          const btn=mk('button',{
+            cls:'sm'+(avail===0?' ghost':''),
+            style:{fontSize:'10px',padding:'2px 6px',opacity:avail===0?'0.4':'1',
+                   borderColor:avail>0?'var(--purl)':'',color:avail>0?'var(--purl)':''}
+          },[lv+'° (+'+gain+'pt)']);
+          btn.disabled=avail===0;
+          btn.addEventListener('click',()=>{
+            if(C.ss[lv]&&C.ss[lv].u<C.ss[lv].m){
+              C.ss[lv].u++;
+              if(!C.res)C.res=[];
+              const sr=C.res.find(r=>r._scalingKey==='sorcery');
+              if(sr){sr.cur=Math.min(sr.max,(sr.cur||0)+gain);}
+              save();render();
+            }
+          });
+          return btn;
+        })
+      ),
+
+      // Punti → Slot
+      mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'4px'}},['Crea slot da punti:']),
+      mk('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
+        [1,2,3,4,5].map(lv=>{
+          const cost=slotCost[lv];
+          const canAfford=sorcPts>=cost;
+          const btn=mk('button',{
+            cls:'sm'+(canAfford?'':' ghost'),
+            style:{fontSize:'10px',padding:'2px 6px',opacity:canAfford?'1':'0.4',
+                   borderColor:canAfford?'var(--gold)':'',color:canAfford?'var(--gold)':''}
+          },[lv+'° (-'+cost+'pt)']);
+          btn.disabled=!canAfford;
+          btn.addEventListener('click',()=>{
+            if(!C.res)return;
+            const sr=C.res.find(r=>r._scalingKey==='sorcery');
+            if(sr&&(sr.cur||0)>=cost){
+              sr.cur-=cost;
+              // Aggiungi uno slot temporaneo (aumenta max e lo lascia disponibile)
+              if(!C.ss[lv])C.ss[lv]={m:0,u:0};
+              C.ss[lv].m++;
+              save();render();
+            }
+          });
+          return btn;
+        })
+      ),
+      mk('div',{style:{color:'var(--tk)',fontSize:'9px',marginTop:'6px'}},['I slot creati vengono aggiunti a quelli normali e si perdono col Riposo Lungo.']),
+    ],{border:'1px solid rgba(138,80,192,0.4)',marginTop:'8px'});
+    p.appendChild(fcCard);
+  }
+
   // Effetti temporanei
   const teCard=CARD([
     ROW([LBL('Effetti Temporanei'),BTN('+ Effetto',()=>{C.te.push({n:'',d:'',dur:''});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}),
@@ -2059,8 +2195,13 @@ function pgCombat(){
       const thpOld=C.thp||0;
       if(thpOld>0){const used=Math.min(thpOld,rem);C.thp=thpOld-used;rem-=used;}
       C.hp=Math.max(-999,Math.min(C.maxHp||0,(C.hp||0)-rem));
+      // ── Se scende a 0 PF, rompi concentrazione automaticamente ──
+      if(C.hp<=0 && C.concentration){
+        C.concentration=null;
+        // Il render successivo aggiornerà il banner
+      }
       dInp.value='';save();render();
-      // ── Promemoria concentrazione ──
+      // ── Promemoria concentrazione (solo se ancora vivi e in concentrazione) ──
       if(C.concentration && C.concentration.name){
         const dmgTaken=v;
         const conSave=Math.max(10,Math.floor(dmgTaken/2));
@@ -2074,21 +2215,56 @@ function pgCombat(){
           rpop.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginBottom:'6px'}},['Danno subito: '+dmgTaken+' → TS Costituzione CD '+conSave]));
           const modStr=(conMod>=0?'+':'')+conMod+'(COS)+('+pb+' se comp.)';
           rpop.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginBottom:'8px'}},[modStr]));
-          const rollBtn=BTN('🎲 Tira TS (1d20'+( conMod>=0?'+':'')+conMod+')',()=>{
-            const r=Math.floor(Math.random()*20)+1;
-            const tot=r+conMod;
+          // Funzione che mostra il risultato finale e gestisce successo/fallimento
+          function showConcResult(r1, usedInspiration){
+            const tot=r1+conMod;
             const success=tot>=conSave;
+            const ed2=C.baseEdition||'2014';
+            const hasIns2=(C.ins||0)>0;
             rpop.innerHTML='';
-            rpop.appendChild(mk('div',{style:{color:'var(--bluel)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['TS CONCENTRAZIONE']));
+            rpop.appendChild(mk('div',{style:{color:'var(--bluel)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['TS CONCENTRAZIONE'+(usedInspiration?' ❆':'')]));
             rpop.appendChild(mk('div',{style:{color:success?'var(--greenl)':'var(--rl)',fontFamily:'var(--ft)',fontSize:'28px',lineHeight:'1',textAlign:'center'}},[String(tot)]));
-            rpop.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',textAlign:'center',marginTop:'2px'}},['d20('+r+')'+( conMod>=0?'+':'')+conMod+' vs CD '+conSave]));
+            rpop.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',textAlign:'center',marginTop:'2px'}},['d20('+r1+')'+(conMod>=0?'+':'')+conMod+' vs CD '+conSave+(usedInspiration?' (Ispirazione)':'')]));
+            if(!success){
+              C.concentration=null;save();
+              setTimeout(()=>{if(typeof render==='function')render();},300);
+            }
             rpop.appendChild(mk('div',{style:{color:success?'var(--greenl)':'var(--rl)',fontFamily:'var(--ft)',fontSize:'13px',textAlign:'center',marginTop:'6px'}},[success?'✓ Concentrazione mantenuta':'✗ Concentrazione persa']));
             if(!success){
-              rpop.appendChild(BTN('Rompi concentrazione',()=>{C.concentration=null;save();render();rpop.style.display='none';},'sm',{style:{width:'100%',marginTop:'8px',borderColor:'var(--rl)',color:'var(--rl)'}}));
+              rpop.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'10px',textAlign:'center',marginTop:'4px'}},['L’incantesimo è stato interrotto automaticamente.']));
+              // 2024: offri Ispirazione Eroica (ritira) solo se non ancora usata
+              if(!usedInspiration && hasIns2 && ed2==='2024'){
+                const rerollBtn=BTN('✧ Usa Ispirazione Eroica — Ritira',()=>{
+                  C.ins=Math.max(0,(C.ins||0)-1);save();
+                  const r2=Math.floor(Math.random()*20)+1;
+                  showConcResult(r2,true);
+                },'gold sm',{style:{width:'100%',marginTop:'8px'}});
+                rpop.appendChild(rerollBtn);
+              }
             }
             addRpopCloseBtn(rpop);
             rpop.style.display='block';
-            clearTimeout(window._rpt);window._rpt=setTimeout(()=>rpop.style.display='none',8000);
+            clearTimeout(window._rpt);window._rpt=setTimeout(()=>{rpop.style.display='none';},10000);
+          }
+
+          const rollBtn=BTN('🎲 Tira TS (1d20'+(conMod>=0?'+':'')+conMod+')',()=>{
+            const ed=C.baseEdition||'2014';
+            const hasIns=(C.ins||0)>0;
+            if(hasIns && ed==='2014'){
+              // 2014: ispirazione = vantaggio immediato, tira 2d20 prendi il migliore
+              const r1=Math.floor(Math.random()*20)+1;
+              const r2=Math.floor(Math.random()*20)+1;
+              const best=Math.max(r1,r2);
+              C.ins=Math.max(0,(C.ins||0)-1);save();
+              rpop.innerHTML='';
+              rpop.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['TS CONCENTRAZIONE ♦ VANTAGGIO (Ispirazione 2014)']));
+              rpop.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginBottom:'6px',textAlign:'center'}},['['+r1+', '+r2+'] → migliore: '+best]));
+              showConcResult(best,true);
+            } else {
+              // Tiro singolo; la 2024 offrirà la Heroic Inspiration dopo se fallisce
+              const r1=Math.floor(Math.random()*20)+1;
+              showConcResult(r1,false);
+            }
           },'gold',{style:{width:'100%'}});
           rpop.appendChild(rollBtn);
           addRpopCloseBtn(rpop);
