@@ -638,6 +638,7 @@ function showAttackRoll(atk, isSpell){
         snRow2.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'20px',flex:'0'}},[String(snFinal.t)]));
         snRow2.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',flex:'1'}},[(isCrit?(snDice*2)+'d6':snFormula)+' → ['+snFinal.r.join(',')+']'+(isCrit?' (CRITICO)':'')]));
         snBtn.replaceWith(snRow2);
+        clearTimeout(rpt); // Non auto-chiudere dopo il tiro — l'utente chiude con X
       },'sm',{style:{width:'100%',fontSize:'11px',borderColor:'var(--rl)',color:'var(--rl)'}});
       p.appendChild(snBtn);
     }
@@ -701,6 +702,7 @@ function showAttackRoll(atk, isSpell){
           smRow2.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'20px',flex:'0'}},[String(smFinal.t)]));
           smRow2.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',flex:'1'}},[(isCrit?(totalDice*2)+'d8':smFormula)+' radiosi → ['+smFinal.r.join(',')+']'+(isCrit?' (CRITICO)':'')+(isPact3?' 🔮 patto consumato':' slot '+chosenLv+'° consumato')]));
           smSel.remove();undeadRow.remove();smBtn.replaceWith(smRow2);
+          clearTimeout(rpt); // Non auto-chiudere dopo il tiro — l'utente chiude con X
         },'gold sm',{style:{width:'100%',fontSize:'11px'}});
         p.appendChild(smBtn);
       }
@@ -709,7 +711,7 @@ function showAttackRoll(atk, isSpell){
 
   addRpopCloseBtn(p);
   p.style.display='block';
-  clearTimeout(rpt);rpt=setTimeout(()=>p.style.display='none',10000);
+  clearTimeout(rpt); // Nessun auto-close per il popup attacchi — l'utente chiude con X
 }
 
 // Popup per incantesimo con CD
