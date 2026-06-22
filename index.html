@@ -599,100 +599,97 @@ function showAttackRoll(atk, isSpell){
   row.appendChild(dmgCol);
   p.appendChild(row);
 
-  // ── Sneak Attack (Ladro) ──
-  const rogLv=(()=>{
-    if(C.classes&&C.classes.length>0){const rc=C.classes.find(c=>c.name==='Ladro');return rc?Number(rc.lv)||0:0;}
-    return (C.cls||'').toLowerCase()==='ladro'?(C.lv||0):0;
-  })();
-  if(rogLv>0 && !isSpell){
-    // Sneak Attack: 1d6 ogni 2 livelli (arrotondato per eccesso)
-    const snDice=Math.ceil(rogLv/2);
-    const snFormula=snDice+'d6';
-    const snSep=mk('div',{style:{height:'1px',background:'var(--border)',margin:'6px 0'}});
-    p.appendChild(snSep);
-    p.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['ATTACCO FURTIVO — '+snFormula]));
-    const snBtn=BTN('⚄ Tira Attacco Furtivo',()=>{
-      const snResult=roll(snFormula);
-      // Critico: raddoppia i dadi
-      const snFinal=isCrit?roll(snDice*2+'d6'):snResult;
-      const snRow2=mk('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginTop:'4px'}});
-      snRow2.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'20px',flex:'0'}},[String(snFinal.t)]));
-      snRow2.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',flex:'1'}},[(isCrit?(snDice*2)+'d6':snFormula)+' → ['+snFinal.r.join(',')+']'+(isCrit?' (CRITICO)':'')]));
-      // Sostituisci il bottone con il risultato
-      snBtn.replaceWith(snRow2);
-    },'sm',{style:{width:'100%',fontSize:'11px',borderColor:'var(--rl)',color:'var(--rl)'}});
-    p.appendChild(snBtn);
-  }
-
-  // ── Divine Smite (Paladino) ──
-  const palLv=(()=>{
-    if(C.classes&&C.classes.length>0){const pc=C.classes.find(c=>c.name==='Paladino');return pc?Number(pc.lv)||0:0;}
-    return (C.cls||'').toLowerCase()==='paladino'?(C.lv||0):0;
-  })();
-  if(palLv>0 && !isSpell){
-    // Trova slot normali disponibili dal lv1 in su
-    const smiteSlots=[];
-    for(let l=1;l<=5;l++){ // Smite max slot 5°
-      const s=C.ss[l]||{m:0,u:0};
-      const av=(s.m||0)-(s.u||0);
-      if(av>0)smiteSlots.push({l,av});
+  // ── Sneak Attack (Ladro) — try/catch per sicurezza ──
+  try {
+    // Cerca Ladro in multiclasse (case-insensitive) OPPURE in singola classe
+    const rogLv=(()=>{
+      if(C.classes&&C.classes.length>0){
+        const rc=C.classes.find(c=>(c.name||'').toLowerCase()==='ladro'||(c.customName||'').toLowerCase()==='ladro');
+        return rc?Number(rc.lv)||0:0;
+      }
+      return (C.cls||'').toLowerCase()==='ladro'?(C.lv||0):0;
+    })();
+    if(rogLv>0 && !isSpell){
+      const snDice=Math.ceil(rogLv/2);
+      const snFormula=snDice+'d6';
+      const snSep=mk('div',{style:{height:'1px',background:'var(--border)',margin:'6px 0'}});
+      p.appendChild(snSep);
+      p.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['ATTACCO FURTIVO — '+snFormula]));
+      const snBtn=BTN('⚄ Tira Attacco Furtivo',()=>{
+        const snResult=roll(snFormula);
+        const snFinal=isCrit?roll(snDice*2+'d6'):snResult;
+        const snRow2=mk('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginTop:'4px'}});
+        snRow2.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'20px',flex:'0'}},[String(snFinal.t)]));
+        snRow2.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',flex:'1'}},[(isCrit?(snDice*2)+'d6':snFormula)+' → ['+snFinal.r.join(',')+']'+(isCrit?' (CRITICO)':'')]));
+        snBtn.replaceWith(snRow2);
+      },'sm',{style:{width:'100%',fontSize:'11px',borderColor:'var(--rl)',color:'var(--rl)'}});
+      p.appendChild(snBtn);
     }
-    // Considera anche slot patto Warlock se multiclasse
-    const wlSmite=getWarlockLevel?getWarlockLevel():0;
-    const pactAvSmite=wlSmite>0?Math.max(0,(C.pactMagic?.m||0)-(C.pactMagic?.u||0)):0;
-    const pactLvSmite=C.pactMagic?.lv||1;
-    if(pactAvSmite>0&&pactLvSmite<=5)smiteSlots.unshift({l:'pact_'+pactLvSmite,av:pactAvSmite,isPact:true});
+  } catch(e){console.warn('Sneak Attack error:',e);}
 
-    if(smiteSlots.length>0){
-      const smSep=mk('div',{style:{height:'1px',background:'var(--border)',margin:'6px 0'}});
-      p.appendChild(smSep);
-      p.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['DIVINE SMITE']));
+  // ── Divine Smite (Paladino) — try/catch per sicurezza ──
+  try {
+    // Cerca Paladino in multiclasse (case-insensitive) OPPURE in singola classe
+    const palLv=(()=>{
+      if(C.classes&&C.classes.length>0){
+        const pc=C.classes.find(c=>(c.name||'').toLowerCase()==='paladino'||(c.customName||'').toLowerCase()==='paladino');
+        return pc?Number(pc.lv)||0:0;
+      }
+      return (C.cls||'').toLowerCase()==='paladino'?(C.lv||0):0;
+    })();
+    if(palLv>0 && !isSpell){
+      const smiteSlots=[];
+      for(let l=1;l<=5;l++){
+        const s=C.ss[l]||{m:0,u:0};
+        const av=(s.m||0)-(s.u||0);
+        if(av>0)smiteSlots.push({l,av});
+      }
+      const wlSmite=(typeof getWarlockLevel==='function')?getWarlockLevel():0;
+      const pactAvSmite=wlSmite>0?Math.max(0,(C.pactMagic?.m||0)-(C.pactMagic?.u||0)):0;
+      const pactLvSmite=C.pactMagic?.lv||1;
+      if(pactAvSmite>0&&pactLvSmite<=5)smiteSlots.unshift({l:'pact_'+pactLvSmite,av:pactAvSmite,isPact:true});
 
-      // Selettore slot
-      const smSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--gold)',color:'var(--gl)',borderRadius:'4px',padding:'3px 6px',fontSize:'11px',width:'100%',marginBottom:'4px'}});
-      smiteSlots.forEach(sl=>{
-        const isPact=!!sl.isPact;
-        const realLv=isPact?pactLvSmite:sl.l;
-        const smDice=1+realLv; // base 2d8 al lv1, +1d8 per livello extra
-        const label=isPact?'🔮 Slot Patto '+realLv+'° — '+smDice+'d8 radiosi ('+sl.av+' disp.)':'Slot '+realLv+'° — '+smDice+'d8 radiosi ('+sl.av+' disp.)';
-        const o=mk('option',{value:isPact?'pact':String(sl.l)},[label]);
-        smSel.appendChild(o);
-      });
-      p.appendChild(smSel);
-
-      // Checkbox non morti/non naturali (+1d8)
-      const undeadChk=mk('span',{cls:'chkb'},['']);
-      let isUndead=false;
-      undeadChk.addEventListener('click',()=>{
-        isUndead=!isUndead;
-        undeadChk.classList.toggle('on',isUndead);
-        undeadChk.textContent=isUndead?'✦':'';
-      });
-      const undeadRow=ROW([undeadChk,mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['Vs non morto/non naturale (+1d8)'])],{gap:'6px',marginBottom:'4px'});
-      p.appendChild(undeadRow);
-
-      const smBtn=BTN('⚄ Tira Divine Smite',()=>{
-        const chosenVal=smSel.value;
-        const isPact=chosenVal==='pact';
-        const chosenLv=isPact?pactLvSmite:Number(chosenVal);
-        const baseDice=1+chosenLv;
-        const totalDice=baseDice+(isUndead?1:0);
-        const smFormula=totalDice+'d8';
-        const smResult=roll(smFormula);
-        // Critico: raddoppia i dadi
-        const smFinal=isCrit?roll(totalDice*2+'d8'):smResult;
-        // Consuma slot
-        if(isPact){if(C.pactMagic)C.pactMagic.u=(C.pactMagic.u||0)+1;save();}
-        else{if(C.ss[chosenLv]&&C.ss[chosenLv].u<C.ss[chosenLv].m){C.ss[chosenLv].u++;save();}}
-        const smRow2=mk('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginTop:'4px'}});
-        smRow2.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'20px',flex:'0'}},[String(smFinal.t)]));
-        smRow2.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',flex:'1'}},[(isCrit?(totalDice*2)+'d8':smFormula)+' radiosi → ['+smFinal.r.join(',')+']'+(isCrit?' (CRITICO)':'')+(isPact?' 🔮 patto consumato':' slot '+chosenLv+'° consumato')]));
-        // Sostituisci selettore+checkbox+bottone
-        smSel.remove();undeadRow.remove();smBtn.replaceWith(smRow2);
-      },'gold sm',{style:{width:'100%',fontSize:'11px'}});
-      p.appendChild(smBtn);
+      if(smiteSlots.length>0){
+        const smSep=mk('div',{style:{height:'1px',background:'var(--border)',margin:'6px 0'}});
+        p.appendChild(smSep);
+        p.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['DIVINE SMITE']));
+        const smSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--gold)',color:'var(--gl)',borderRadius:'4px',padding:'3px 6px',fontSize:'11px',width:'100%',marginBottom:'4px'}});
+        smiteSlots.forEach(sl=>{
+          const isPact2=!!sl.isPact;
+          const realLv=isPact2?pactLvSmite:sl.l;
+          const smDice=1+realLv;
+          const label=isPact2?'🔮 Slot Patto '+realLv+'° — '+smDice+'d8 ('+sl.av+' disp.)':'Slot '+realLv+'° — '+smDice+'d8 radiosi ('+sl.av+' disp.)';
+          smSel.appendChild(mk('option',{value:isPact2?'pact':String(sl.l)},[label]));
+        });
+        p.appendChild(smSel);
+        const undeadChk=mk('span',{cls:'chkb'},[]);
+        let isUndead=false;
+        undeadChk.addEventListener('click',()=>{
+          isUndead=!isUndead;
+          undeadChk.classList.toggle('on',isUndead);
+          undeadChk.textContent=isUndead?'✦':'';
+        });
+        const undeadRow=ROW([undeadChk,mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['Vs non morto/non naturale (+1d8)'])],{gap:'6px',marginBottom:'4px'});
+        p.appendChild(undeadRow);
+        const smBtn=BTN('⚄ Tira Divine Smite',()=>{
+          const chosenVal=smSel.value;
+          const isPact3=chosenVal==='pact';
+          const chosenLv=isPact3?pactLvSmite:Number(chosenVal);
+          const baseDice=1+chosenLv;
+          const totalDice=baseDice+(isUndead?1:0);
+          const smFormula=totalDice+'d8';
+          const smFinal=isCrit?roll(totalDice*2+'d8'):roll(smFormula);
+          if(isPact3){if(C.pactMagic)C.pactMagic.u=(C.pactMagic.u||0)+1;save();}
+          else{if(C.ss[chosenLv]&&C.ss[chosenLv].u<C.ss[chosenLv].m){C.ss[chosenLv].u++;save();}}
+          const smRow2=mk('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginTop:'4px'}});
+          smRow2.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'20px',flex:'0'}},[String(smFinal.t)]));
+          smRow2.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',flex:'1'}},[(isCrit?(totalDice*2)+'d8':smFormula)+' radiosi → ['+smFinal.r.join(',')+']'+(isCrit?' (CRITICO)':'')+(isPact3?' 🔮 patto consumato':' slot '+chosenLv+'° consumato')]));
+          smSel.remove();undeadRow.remove();smBtn.replaceWith(smRow2);
+        },'gold sm',{style:{width:'100%',fontSize:'11px'}});
+        p.appendChild(smBtn);
+      }
     }
-  }
+  } catch(e){console.warn('Divine Smite error:',e);}
 
   addRpopCloseBtn(p);
   p.style.display='block';
