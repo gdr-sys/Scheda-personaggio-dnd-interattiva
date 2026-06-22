@@ -63,7 +63,7 @@ body.light .nb.on .tx{color:var(--gl)}
 .mbox::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gd),transparent);border-radius:8px 8px 0 0}
 .mpur{border-color:var(--purl)}
 .mpur::before{background:linear-gradient(90deg,transparent,var(--purl),transparent)}
-.rpop{position:fixed;bottom:80px;right:12px;left:12px;background:var(--card);border:1px solid var(--gold);border-radius:8px;padding:8px 22px 8px 12px;z-index:999;text-align:center;min-width:110px;max-width:420px;max-height:70vh;overflow-y:auto;display:none;margin:0 auto}
+.rpop{position:fixed;bottom:80px;right:12px;background:var(--card);border:1px solid var(--gold);border-radius:8px;z-index:9999;text-align:left;min-width:240px;width:min(340px,calc(100vw - 24px));max-height:55vh;display:none;flex-direction:column;overflow:hidden}
 .irow{background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;padding:6px}
 .srow{display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid rgba(90,62,27,.15)}
 .mgrow{display:flex;align-items:center;gap:4px;padding:4px 0;border-bottom:1px solid rgba(90,62,27,.15)}
@@ -516,9 +516,25 @@ function buildDmgFormula(dmgDice, statKey, extraBonus){
 // Popup dado migliorato — mostra tiro colpire + danni separati
 // Pulsante X per chiudere manualmente il popup dei dadi
 function addRpopCloseBtn(p){
-  const closeBtn=mk('span',{style:{position:'absolute',top:'4px',right:'6px',color:'var(--td)',fontSize:'14px',cursor:'pointer',lineHeight:'1',padding:'2px 4px',userSelect:'none',zIndex:'1000'},title:'Chiudi'},['✕']);
+  // Struttura: sposta tutto il contenuto esistente in un div scrollabile,
+  // poi aggiunge header fisso con X in cima
+  const existingChildren=Array.from(p.childNodes);
+  const body=mk('div',{style:{overflowY:'auto',WebkitOverflowScrolling:'touch',padding:'8px 22px 8px 12px',flex:'1',minHeight:'0'}});
+  existingChildren.forEach(ch=>body.appendChild(ch));
+  const hdr=mk('div',{style:{display:'flex',justifyContent:'flex-end',padding:'4px 6px 0',flexShrink:'0',background:'var(--card)',borderRadius:'8px 8px 0 0'}});
+  const closeBtn=mk('span',{style:{color:'var(--td)',fontSize:'16px',cursor:'pointer',lineHeight:'1',padding:'2px 8px',userSelect:'none'},title:'Chiudi'},['✕']);
   closeBtn.addEventListener('click',()=>{p.style.display='none';clearTimeout(rpt);});
-  p.appendChild(closeBtn);
+  hdr.appendChild(closeBtn);
+  p.innerHTML='';
+  p.appendChild(hdr);
+  p.appendChild(body);
+  // Imposta display flex sul popup (non 'block') per attivare il layout colonna
+  // Le chiamate a p.style.display='block' successive vengono sovrascritte da questo
+  // Nota: il chiamante farà p.style.display='block' dopo — va bene, ma dobbiamo
+  // usare flex. Sovrascriviamo con un piccolo trick: monitoriamo con requestAnimationFrame
+  // OPPURE più semplicemente: dopo la chiamata a addRpopCloseBtn, il chiamante
+  // fa display='block' — noi qui forziamo flex con !important via style inline
+  p.style.setProperty('display','flex','important');
 }
 
 function showAttackRoll(atk, isSpell){
