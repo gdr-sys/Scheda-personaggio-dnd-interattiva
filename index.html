@@ -612,16 +612,27 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
   // (e se è un incantesimo livellato, consuma comunque lo slot base se disponibile)
   if(!daHigher || !dmgDice){
     let consumed=null;
+    let consumedPactNS=null;
+    let pactLvNS=null;
     if(!isCantrip && baseLv>0){
-      const wasAvail=(C.ss[baseLv]?.m||0)-(C.ss[baseLv]?.u||0);
-      if(wasAvail>0){consumeSlotIfAvailable(baseLv);consumed=baseLv;}
+      const wlNS=getWarlockLevel();
+      const pactAvNS=wlNS>0?Math.max(0,(C.pactMagic?.m||0)-(C.pactMagic?.u||0)):0;
+      const pactLvNS2=C.pactMagic?.lv||1;
+      const normalAvail=(C.ss[baseLv]?.m||0)-(C.ss[baseLv]?.u||0);
+      const pactUsableNS=pactAvNS>0 && pactLvNS2>=baseLv;
+      if(normalAvail>0){consumeSlotIfAvailable(baseLv);consumed=baseLv;}
+      else if(pactUsableNS){C.pactMagic.u=(C.pactMagic.u||0)+1;save();consumedPactNS='pact';pactLvNS=pactLvNS2;}
     }
-    renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, consumed);
+    renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, consumed, consumedPactNS, pactLvNS);
     return;
   }
 
-  // Per incantesimi livellati: trova quali slot sono disponibili dal livello base in su
+  // Per incantesimi livellati: trova quali slot normali e slot patto disponibili
   let availableLevels=[];
+  const wlLvPopup=getWarlockLevel();
+  const pactAvailPopup=wlLvPopup>0?Math.max(0,(C.pactMagic?.m||0)-(C.pactMagic?.u||0)):0;
+  const pactLvPopup=C.pactMagic?.lv||1;
+
   if(!isCantrip){
     const minLv=baseLv||1;
     for(let l=minLv;l<=9;l++){
@@ -629,85 +640,120 @@ function showSpellRollPopup(spellName, dmgDice, saveAttr, baseLv, daHigher, isCa
       const avail=(s.m||0)-(s.u||0);
       if(avail>0)availableLevels.push(l);
     }
-    // Nessuno slot disponibile — avvisa e non far tirare
-    if(availableLevels.length===0){
+    // Controlla se lo slot patto è utilizzabile (livello patto >= livello base incantesimo)
+    const pactUsable=pactAvailPopup>0 && pactLvPopup>=(baseLv||1);
+    const hasNormalSlots=availableLevels.length>0;
+
+    if(!hasNormalSlots && !pactUsable){
+      // Nessuno slot disponibile — avvisa
       const p=document.getElementById('rpop');
       p.innerHTML='';
       p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
-      p.appendChild(mk('div',{style:{color:'var(--rl)',fontSize:'12px',marginBottom:'8px'}},['⚠ Nessuno slot disponibile di livello '+minLv+' o superiore.']));
-      const okBtn=BTN('Chiudi',()=>{p.style.display='none';},'ghost',{style:{width:'100%'}});
-      p.appendChild(okBtn);
+      p.appendChild(mk('div',{style:{color:'var(--rl)',fontSize:'12px',marginBottom:'8px'}},['⚠ Nessuno slot disponibile di livello '+(baseLv||1)+'° o superiore.']));
+      p.appendChild(BTN('Chiudi',()=>{p.style.display='none';},'ghost',{style:{width:'100%'}}));
       addRpopCloseBtn(p);
       p.style.display='block';
       clearTimeout(rpt);
       return;
     }
-  }
 
-  // Mostra prima il selettore del livello/slot usato
-  const p=document.getElementById('rpop');
-  p.innerHTML='';
-  p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
+    // Se entrambi disponibili → chiedi quale usare (con scelta nel selettore)
+    // Se solo patto → usa automaticamente patto senza chiedere
+    // Se solo normali → comportamento normale
+    if(!hasNormalSlots && pactUsable){
+      // Solo slot patto disponibili — usa direttamente
+      let finalDice=dmgDice;
+      if(daHigher){
+        const extraLevels=Math.max(0,pactLvPopup-(baseLv||1));
+        if(extraLevels>0){
+          const hm=daHigher.match(/^(\d+)(d\d+)$/i);
+          const bm=(dmgDice||'').match(/^(\d+)(d\d+)(.*)$/i);
+          if(hm&&bm&&hm[2]===bm[2]){
+            finalDice=(parseInt(bm[1])+parseInt(hm[1])*extraLevels)+bm[2]+(bm[3]||'');
+          }
+        }
+      }
+      C.pactMagic.u=(C.pactMagic.u||0)+1;save();
+      renderSpellRollResult(spellName,finalDice,saveAttr,spCD,pb,scaMod,null,'pact',pactLvPopup);
+      return;
+    }
 
-  const lvLabel=mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'4px'}},
-    [isCantrip?'A che livello sei?':'Con che slot lo lanci?']
-  );
-  p.appendChild(lvLabel);
+    // Costruisce il selettore con eventuale slot patto in cima (se disponibile)
+    const p=document.getElementById('rpop');
+    p.innerHTML='';
+    p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
+    p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'4px'}},['Con che slot lo lanci?']));
 
-  const lvSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--gold)',color:'var(--gl)',borderRadius:'4px',padding:'4px 8px',fontSize:'13px',width:'100%',marginBottom:'6px'}});
-  if(isCantrip){
-    // Trucchetti scalano col livello personaggio: 1, 5, 11, 17 (sempre disponibili, nessuno slot)
-    [[1,'Liv. 1-4 (base)'],[5,'Liv. 5-10'],[11,'Liv. 11-16'],[17,'Liv. 17-20']].forEach(([v,l])=>{
-      const o=mk('option',{value:v},[l]);
-      if((C.lv||1)>=v && (C.lv||1) < (v===1?5:v===5?11:v===11?17:99)) o.selected=true;
+    const lvSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--gold)',color:'var(--gl)',borderRadius:'4px',padding:'4px 8px',fontSize:'13px',width:'100%',marginBottom:'6px'}});
+
+    // Slot patto (se disponibile e compatibile) — prima opzione viola
+    if(pactUsable){
+      const o=mk('option',{value:'pact'},['🔮 Slot Patto '+pactLvPopup+'° (Warlock) — '+pactAvailPopup+' disp.']);
+      o.style.color='var(--purl)';
       lvSel.appendChild(o);
-    });
-  } else {
-    // Solo i livelli con slot effettivamente disponibili
+    }
+    // Slot normali
     availableLevels.forEach(l=>{
       const s=C.ss[l]||{m:0,u:0};
       const avail=(s.m||0)-(s.u||0);
-      const o=mk('option',{value:l},['Slot '+l+'° livello'+(l===baseLv?' (base)':'')+' — '+avail+' disp.']);
-      if(l===baseLv)o.selected=true;
+      const o=mk('option',{value:String(l)},['Slot '+l+'° livello'+(l===baseLv?' (base)':'')+' — '+avail+' disp.']);
+      if(l===baseLv && !pactUsable)o.selected=true;
       lvSel.appendChild(o);
     });
+    p.appendChild(lvSel);
+
+    const confirmBtn=BTN('⚄ Tira',()=>{
+      const chosenVal=lvSel.value;
+      const isPact=chosenVal==='pact';
+      const chosenLv=isPact?pactLvPopup:Number(chosenVal);
+      let finalDice=dmgDice;
+      const extraLevels=Math.max(0,chosenLv-(baseLv||1));
+      if(extraLevels>0&&daHigher){
+        const hm=daHigher.match(/^(\d+)(d\d+)$/i);
+        const bm=(dmgDice||'').match(/^(\d+)(d\d+)(.*)$/i);
+        if(hm&&bm&&hm[2]===bm[2]){
+          finalDice=(parseInt(bm[1])+parseInt(hm[1])*extraLevels)+bm[2]+(bm[3]||'');
+        }
+      }
+      if(isPact){C.pactMagic.u=(C.pactMagic.u||0)+1;save();}
+      else{consumeSlotIfAvailable(chosenLv);}
+      renderSpellRollResult(spellName,finalDice,saveAttr,spCD,pb,scaMod,isPact?null:chosenLv,isPact?'pact':null,isPact?pactLvPopup:null);
+    },'gold',{style:{width:'100%'}});
+    p.appendChild(confirmBtn);
+    addRpopCloseBtn(p);
+    p.style.display='block';
+    clearTimeout(rpt);
+    return;
   }
+
+  // Percorso trucchetti (isCantrip) — invariato
+  const p=document.getElementById('rpop');
+  p.innerHTML='';
+  p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
+  p.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'4px'}},['A che livello sei?']));
+
+  const lvSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--gold)',color:'var(--gl)',borderRadius:'4px',padding:'4px 8px',fontSize:'13px',width:'100%',marginBottom:'6px'}});
+  [[1,'Liv. 1-4 (base)'],[5,'Liv. 5-10'],[11,'Liv. 11-16'],[17,'Liv. 17-20']].forEach(([v,l])=>{
+    const o=mk('option',{value:v},[l]);
+    if((C.lv||1)>=v && (C.lv||1) < (v===1?5:v===5?11:v===11?17:99)) o.selected=true;
+    lvSel.appendChild(o);
+  });
   p.appendChild(lvSel);
 
   const confirmBtn=BTN('⚄ Tira',()=>{
     const chosenLv=Number(lvSel.value);
     let finalDice=dmgDice;
-    if(isCantrip){
-      // Calcola quante volte raddoppiare il dado base in base al livello
-      const tier=chosenLv>=17?3:chosenLv>=11?2:chosenLv>=5?1:0;
-      if(tier>0&&daHigher){
-        const dm=dmgDice.match(/^(\d+)(d\d+.*)$/i);
-        if(dm){
-          const baseNum=parseInt(dm[1]);
-          finalDice=(baseNum*(tier+1))+dm[2];
-        }
-      }
-    } else {
-      // Incantesimi livellati: aggiungi daHigher per ogni livello extra sopra il base
-      const extraLevels=Math.max(0,chosenLv-(baseLv||1));
-      if(extraLevels>0&&daHigher){
-        const hm=daHigher.match(/^(\d+)(d\d+)$/i);
-        const bm=dmgDice.match(/^(\d+)(d\d+)(.*)$/i);
-        if(hm&&bm&&hm[2]===bm[2]){
-          const newNum=parseInt(bm[1])+parseInt(hm[1])*extraLevels;
-          finalDice=newNum+bm[2]+(bm[3]||'');
-        }
-      }
-      // Consuma automaticamente lo slot scelto
-      consumeSlotIfAvailable(chosenLv);
+    const tier=chosenLv>=17?3:chosenLv>=11?2:chosenLv>=5?1:0;
+    if(tier>0&&daHigher){
+      const dm=dmgDice.match(/^(\d+)(d\d+.*)$/i);
+      if(dm){const baseNum=parseInt(dm[1]);finalDice=(baseNum*(tier+1))+dm[2];}
     }
-    renderSpellRollResult(spellName, finalDice, saveAttr, spCD, pb, scaMod, isCantrip?null:chosenLv);
+    renderSpellRollResult(spellName,finalDice,saveAttr,spCD,pb,scaMod,null,null,null);
   },'gold',{style:{width:'100%'}});
   p.appendChild(confirmBtn);
   addRpopCloseBtn(p);
-
   p.style.display='block';
-  clearTimeout(rpt); // Non auto-chiude finché l'utente non sceglie
+  clearTimeout(rpt);
 }
 
 // Consuma uno slot incantesimo di un dato livello, se disponibile
@@ -725,7 +771,7 @@ function consumeSlotIfAvailable(level){
   }
 }
 
-function renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, consumedSlot){
+function renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, consumedSlot, consumedPact, pactLv){
   const p=document.getElementById('rpop');
   p.innerHTML='';
   p.appendChild(mk('div',{style:{color:'var(--td)',fontFamily:'var(--ft)',fontSize:'11px',marginBottom:'6px',letterSpacing:'1px'}},[spellName]));
@@ -753,6 +799,9 @@ function renderSpellRollResult(spellName, dmgDice, saveAttr, spCD, pb, scaMod, c
   p.appendChild(row);
   if(consumedSlot){
     p.appendChild(mk('div',{style:{color:'var(--bluel)',fontSize:'9px',marginTop:'6px',textAlign:'center'}},['🔹 Slot '+consumedSlot+'° livello consumato']));
+  }
+  if(consumedPact==='pact'){
+    p.appendChild(mk('div',{style:{color:'var(--purl)',fontSize:'9px',marginTop:'6px',textAlign:'center'}},['🔮 Slot Patto '+pactLv+'° consumato (si ricarica col Riposo Breve)']));
   }
   addRpopCloseBtn(p);
   p.style.display='block';
@@ -1582,6 +1631,100 @@ function pgMain(){
     ensureScalingResource('superiority','Dadi Superiorità',fighterLv,lv=>lv>=18?'1d12':lv>=10?'1d10':'1d8',lv=>lv>=15?6:lv>=7?5:4);
   }
 
+  // ── Edizione corrente ──
+  const ed=C.baseEdition||'2014';
+
+  // helper generico per aggiornare/creare una risorsa auto
+  function upsertRes(key,name,maxVal,recharge,die){
+    if(!C.res)C.res=[];
+    let r=C.res.find(rr=>rr._scalingKey===key);
+    if(!r){
+      r={n:name,max:maxVal,cur:maxVal,recharge:recharge,die:die||'',_scalingKey:key,auto:true};
+      C.res.push(r);
+    } else {
+      // aggiorna max/dado ma rispetta eventuali modifiche manuali al nome
+      r.max=maxVal;
+      r.die=die||r.die||'';
+      if(r.cur>r.max)r.cur=r.max;
+      if(!r.n)r.n=name;
+    }
+  }
+
+  // ── Stregone: Punti Stregoneria ──
+  // 2014: 0 al lv1, poi = livello dal lv2
+  // 2024: = livello dal lv1 (in pratica identico perché al lv1 non esistono opzioni da comprare)
+  // Entrambe le edizioni: max = livello classe
+  const sorcLv=getClassLevel('Stregone');
+  if(sorcLv>0){
+    const sorcMax=sorcLv; // uguale in entrambe le edizioni
+    upsertRes('sorcery','Punti Stregoneria',sorcMax,'long','');
+  }
+
+  // ── Chierico: Channel Divinity ──
+  // 2014: 1 uso lv1-5 | 2 usi lv6-17 | 3 usi lv18+   — ricarica Riposo Breve
+  // 2024: 2 usi lv2+  | 3 usi lv6+                    — ricarica Riposo Breve
+  const chiericoLv=getClassLevel('Chierico');
+  if(chiericoLv>0){
+    let cdcMax;
+    if(ed==='2024'){
+      cdcMax=chiericoLv>=6?3:2; // 2024: parte da 2 usi al lv2
+    } else {
+      cdcMax=chiericoLv>=18?3:chiericoLv>=6?2:1; // 2014
+    }
+    upsertRes('channel_cleric','Channel Divinity (Chierico)',cdcMax,'short','');
+  }
+
+  // ── Paladino: Channel Divinity ──
+  // 2014: 1 uso sempre (lv1-20)
+  // 2024: 2 usi lv6+ | 3 usi lv11+                    — ricarica Riposo Breve
+  const paladinoLv=getClassLevel('Paladino');
+  if(paladinoLv>0){
+    let cdpMax;
+    if(ed==='2024'){
+      cdpMax=paladinoLv>=11?3:paladinoLv>=6?2:1;
+    } else {
+      cdpMax=1; // 2014: sempre 1 uso
+    }
+    upsertRes('channel_paladin','Channel Divinity (Paladino)',cdpMax,'short','');
+  }
+
+  // ── Monaco: Punti Ki / Disciplina ──
+  // Identici in entrambe le edizioni: = livello Monaco, ricarica Riposo Breve
+  const monacoLv=getClassLevel('Monaco');
+  if(monacoLv>0){
+    const kiName=ed==='2024'?'Punti Disciplina':'Punti Ki';
+    upsertRes('ki',kiName,monacoLv,'short','');
+  }
+
+  // ── Guerriero: Second Wind ──
+  // 2014: cura 1d10 (dado fisso, nessun bonus livello)
+  // 2024: cura 1d10 + livello Guerriero
+  // Ricarica Riposo Breve in entrambe. 1 uso sempre.
+  if(fighterLv>0){
+    const swDie=ed==='2024'?'1d10+'+fighterLv:'1d10';
+    upsertRes('second_wind','Second Wind',1,'short',swDie);
+
+    // ── Guerriero: Action Surge ──
+    // Identica in entrambe: 1 uso (2 al lv20), ricarica Riposo Breve
+    const asMax=fighterLv>=20?2:1;
+    upsertRes('action_surge','Action Surge',asMax,'short','');
+  }
+
+  // ── Rimozione risorse auto quando la classe non è più presente ──
+  const autoKeyClassMap={
+    'sorcery':'Stregone','channel_cleric':'Chierico','channel_paladin':'Paladino',
+    'ki':'Monaco','second_wind':'Guerriero','action_surge':'Guerriero',
+    'bardic':'Bardo','superiority':'Guerriero'
+  };
+  if(C.res){
+    C.res=C.res.filter(r=>{
+      if(!r._scalingKey||!r.auto)return true;
+      const requiredClass=autoKeyClassMap[r._scalingKey];
+      if(!requiredClass)return true;
+      return getClassLevel(requiredClass)>0;
+    });
+  }
+
   // Risorse
   const resCard=CARD([
     ROW([LBL('Risorse'),BTN('+ Risorsa',()=>{C.res.push({n:'',max:1,cur:1,recharge:'long',die:''});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}),
@@ -1763,6 +1906,42 @@ function pgCombat(){
       if(thpOld>0){const used=Math.min(thpOld,rem);C.thp=thpOld-used;rem-=used;}
       C.hp=Math.max(-999,Math.min(C.maxHp||0,(C.hp||0)-rem));
       dInp.value='';save();render();
+      // ── Promemoria concentrazione ──
+      if(C.concentration && C.concentration.name){
+        const dmgTaken=v;
+        const conSave=Math.max(10,Math.floor(dmgTaken/2));
+        const pb=C.prof||2;
+        const conMod=Math.floor(((C.con||10)-10)/2);
+        const rpop=document.getElementById('rpop');
+        if(rpop){
+          rpop.innerHTML='';
+          rpop.appendChild(mk('div',{style:{color:'var(--bluel)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['⚠ CONCENTRAZIONE']));
+          rpop.appendChild(mk('div',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'13px',marginBottom:'4px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},[C.concentration.name]));
+          rpop.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'11px',marginBottom:'6px'}},['Danno subito: '+dmgTaken+' → TS Costituzione CD '+conSave]));
+          const modStr=(conMod>=0?'+':'')+conMod+'(COS)+('+pb+' se comp.)';
+          rpop.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginBottom:'8px'}},[modStr]));
+          const rollBtn=BTN('🎲 Tira TS (1d20'+( conMod>=0?'+':'')+conMod+')',()=>{
+            const r=Math.floor(Math.random()*20)+1;
+            const tot=r+conMod;
+            const success=tot>=conSave;
+            rpop.innerHTML='';
+            rpop.appendChild(mk('div',{style:{color:'var(--bluel)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',marginBottom:'4px'}},['TS CONCENTRAZIONE']));
+            rpop.appendChild(mk('div',{style:{color:success?'var(--greenl)':'var(--rl)',fontFamily:'var(--ft)',fontSize:'28px',lineHeight:'1',textAlign:'center'}},[String(tot)]));
+            rpop.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',textAlign:'center',marginTop:'2px'}},['d20('+r+')'+( conMod>=0?'+':'')+conMod+' vs CD '+conSave]));
+            rpop.appendChild(mk('div',{style:{color:success?'var(--greenl)':'var(--rl)',fontFamily:'var(--ft)',fontSize:'13px',textAlign:'center',marginTop:'6px'}},[success?'✓ Concentrazione mantenuta':'✗ Concentrazione persa']));
+            if(!success){
+              rpop.appendChild(BTN('Rompi concentrazione',()=>{C.concentration=null;save();render();rpop.style.display='none';},'sm',{style:{width:'100%',marginTop:'8px',borderColor:'var(--rl)',color:'var(--rl)'}}));
+            }
+            addRpopCloseBtn(rpop);
+            rpop.style.display='block';
+            clearTimeout(window._rpt);window._rpt=setTimeout(()=>rpop.style.display='none',8000);
+          },'gold',{style:{width:'100%'}});
+          rpop.appendChild(rollBtn);
+          addRpopCloseBtn(rpop);
+          rpop.style.display='block';
+          clearTimeout(window._rpt);window._rpt=setTimeout(()=>rpop.style.display='none',10000);
+        }
+      }
     }
     function applyHeal(){
       const v=parseInt(dInp.value)||0;
