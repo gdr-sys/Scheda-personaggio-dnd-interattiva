@@ -377,6 +377,7 @@ const DEF={
   companions:[],
   showWildshape:false,
   wildshapes:[],
+  wsUses:{cur:2,max:2},
   spellCategories:[],  // categorie custom per incantesimi in Combat: [{key,label,color}]
 };
 
@@ -401,6 +402,8 @@ function load(){try{const s=localStorage.getItem('dnd5');if(s){const d=JSON.pars
   if(!C.companions)C.companions=[];
   if(C.showWildshape===undefined)C.showWildshape=false;
   if(!C.wildshapes)C.wildshapes=[];
+  if(!C.wsUses)C.wsUses={cur:2,max:2};
+  if(!C.wsUses)C.wsUses={cur:2,max:2};
   if(!C.spellCategories)C.spellCategories=[];
   if(!C.baseEdition)C.baseEdition=C.spellEdition||'2014';
   if(!C.spellEdition)C.spellEdition=C.baseEdition||'2014';
@@ -1527,6 +1530,7 @@ function pgMain(){
       } else {C.hdUsed=Math.max(0,(C.hdUsed||0)-Math.ceil((C.lv||1)/2));}
       rechargeResources('short');
       if(C.pactMagic)C.pactMagic.u=0;
+      if(C.wsUses){C.wsUses.cur=C.wsUses.max||2;} // Riposo Breve recupera usi Forma Selvatica
       save();render();
     },'sm',{style:{flex:'1',borderColor:'var(--bluel)',color:'var(--bluel)'}}),
     BTN('Riposo Lungo',()=>{
@@ -1710,11 +1714,50 @@ function pgMain(){
     upsertRes('action_surge','Action Surge',asMax,'short','');
   }
 
+  // ── Barbaro: Furia (Rage) ──
+  // Usi: 2@lv1 | 3@lv3 | 4@lv6 | 5@lv12 | 6@lv17 | illimitati@lv20
+  // Bonus danno: +2 lv1-8 | +3 lv9-15 | +4 lv16+ (identico 2014 e 2024)
+  // 2024: Rage aggiunge anche resistenza ai danni da Freddo — meccanica narrativa, no tracker
+  const barbaroLv=getClassLevel('Barbaro');
+  if(barbaroLv>0){
+    const rageUses=barbaroLv>=20?999:barbaroLv>=17?6:barbaroLv>=12?5:barbaroLv>=6?4:barbaroLv>=3?3:2;
+    const rageDmg=barbaroLv>=16?4:barbaroLv>=9?3:2;
+    // Il "dado" lo usiamo per mostrare il bonus danno corrente
+    const rageDie='+'+rageDmg+' danno (Furia)';
+    const rageName=ed==='2024'?'Furia (Rage) 2024':'Furia (Rage)';
+    // Per lv20 (usi illimitati) impostiamo max alto ma modificabile
+    const rageMax=rageUses===999?99:rageUses;
+    upsertRes('rage',rageName,rageMax,'long',rageDie);
+  }
+
+  // ── Paladino: Lay on Hands ──
+  // Pool PF = 5 × livello Paladino, ricarica Riposo Lungo (identico 2014 e 2024)
+  // Gestito come risorsa con max scalabile; il dado mostra "PF pool"
+  if(paladinoLv>0){
+    const lohMax=paladinoLv*5;
+    // Usiamo una risorsa speciale: max = pool totale, cur = PF rimasti
+    if(!C.res)C.res=[];
+    let loh=C.res.find(rr=>rr._scalingKey==='lay_on_hands');
+    if(!loh){
+      loh={n:'Lay on Hands (pool PF)',max:lohMax,cur:lohMax,recharge:'long',die:'',_scalingKey:'lay_on_hands',auto:true};
+      C.res.push(loh);
+    } else {
+      // Aggiorna solo se il pool è cambiato (es. cambio livello)
+      if(loh.max!==lohMax){
+        const diff=lohMax-loh.max;
+        loh.max=lohMax;
+        loh.cur=Math.min(lohMax,Math.max(0,(loh.cur||0)+diff));
+      }
+      if(!loh.n)loh.n='Lay on Hands (pool PF)';
+    }
+  }
+
   // ── Rimozione risorse auto quando la classe non è più presente ──
   const autoKeyClassMap={
     'sorcery':'Stregone','channel_cleric':'Chierico','channel_paladin':'Paladino',
     'ki':'Monaco','second_wind':'Guerriero','action_surge':'Guerriero',
-    'bardic':'Bardo','superiority':'Guerriero'
+    'bardic':'Bardo','superiority':'Guerriero',
+    'rage':'Barbaro','lay_on_hands':'Paladino'
   };
   if(C.res){
     C.res=C.res.filter(r=>{
@@ -3356,6 +3399,67 @@ function pgCompanionGeneric(listKey, pageTitle, pageIcon, showBestiary){
     mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'14px',letterSpacing:'1px'}},[pageIcon+' '+pageTitle]),
     ROW(headerButtons,{gap:'6px'}),
   ],{justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}));
+
+  // ── Tracker usi Forma Selvatica (solo per Druido) ──
+  if(listKey==='wildshapes'){
+    const druiLv=(()=>{
+      if(C.classes&&C.classes.length>0){
+        const dc=C.classes.find(c=>c.name==='Druido');
+        return dc?Number(dc.lv)||0:0;
+      }
+      return (C.cls||'').toLowerCase()==='druido'?(C.lv||0):0;
+    })();
+    if(druiLv>0){
+      const wsEd=C.baseEdition||'2014';
+      // 2014: 2 usi riposo breve (sempre, dal lv2)
+      // 2024: 2 usi riposo breve lv2-19 | illimitati lv20
+      // Entrambe: disponibile dal lv2
+      let wsMax, wsNote;
+      if(wsEd==='2024'){
+        wsMax=druiLv>=20?99:2;
+        wsNote=druiLv>=20?'Illimitati (lv 20)':'2 usi — Riposo Breve (2024)';
+      } else {
+        wsMax=2;
+        wsNote='2 usi — Riposo Breve (2014)';
+      }
+      if(!C.wsUses)C.wsUses={cur:wsMax,max:wsMax};
+      // Aggiorna max se cambia livello/edizione
+      if(C.wsUses.max!==wsMax){C.wsUses.max=wsMax;C.wsUses.cur=Math.min(C.wsUses.cur,wsMax);}
+
+      const wsAvail=Math.max(0,C.wsUses.cur||0);
+      const wsCol=wsAvail===0?'var(--rl)':wsAvail<wsMax?'#e8a030':'var(--greenl)';
+
+      // Dots
+      const wsDotsDiv=mk('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}});
+      const dotCount=wsMax>=99?0:wsMax; // se illimitati non mostrare dots
+      for(let i=0;i<dotCount;i++){
+        const dot=mk('div',{cls:'dc'+(i<wsAvail?' on':''),style:{width:'18px',height:'18px'}});
+        wsDotsDiv.appendChild(dot);
+      }
+      if(wsMax>=99){
+        wsDotsDiv.appendChild(mk('span',{style:{color:'var(--greenl)',fontFamily:'var(--ft)',fontSize:'13px'}},['∞']));
+      }
+
+      const wsCard=CARD([
+        ROW([
+          mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'11px',letterSpacing:'1px'}},['🐺 USI FORMA SELVATICA']),
+          mk('span',{style:{color:wsCol,fontFamily:'var(--ft)',fontSize:'13px'}},[wsMax>=99?'∞':String(wsAvail)+'/'+String(wsMax)]),
+        ],{justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}),
+        wsDotsDiv,
+        mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginTop:'4px'}},[wsNote]),
+        ROW([
+          BTN('Usa',()=>{if((C.wsUses.cur||0)>0){C.wsUses.cur--;save();render();}},'gold sm',{style:{flex:'1',opacity:wsAvail===0&&wsMax<99?'0.4':'1'}}),
+          BTN('↺ Riposo Breve',()=>{C.wsUses.cur=wsMax>=99?99:wsMax;save();render();},'sm',{style:{flex:'2',borderColor:'var(--bluel)',color:'var(--bluel)'}}),
+        ],{gap:'6px',marginTop:'8px'}),
+        // Campo max modificabile manualmente
+        ROW([
+          mk('span',{style:{color:'var(--tk)',fontSize:'10px',flexShrink:0}},['Max (modif.):']),
+          NI(wsMax>=99?99:wsMax,v=>{C.wsUses.max=Math.max(1,v);C.wsUses.cur=Math.min(C.wsUses.cur||0,C.wsUses.max);save();render();},1,99,{width:'48px',fontSize:'11px'}),
+        ],{gap:'6px',marginTop:'6px',alignItems:'center'}),
+      ]);
+      p.appendChild(wsCard);
+    }
+  }
 
   if(C[listKey].length===0){
     p.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'13px',textAlign:'center',padding:'32px',fontFamily:'var(--fb)'}},
