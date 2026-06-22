@@ -1201,7 +1201,21 @@ function pgMain(){
   if(C.classes.length===0){
     // Modalità singola classe (legacy)
     classCard.appendChild(GRID([
-      DIV([LBL('Classe'),TI(C.cls||'',v=>{C.cls=v;save();},'',{fontSize:'12px'})]),
+      DIV([LBL('Classe'),(()=>{
+        const clsInp=TI(C.cls||'',v=>{
+          const oldCls=(C.cls||'').toLowerCase().trim();
+          const newCls=v.toLowerCase().trim();
+          // Se il nome classe viene rimosso o cambiato, elimina i features taggati con la vecchia classe
+          if(oldCls && oldCls!==newCls && C.classFeatures){
+            C.classFeatures=C.classFeatures.filter(f=>{
+              const ftag=(f.tag||'').toLowerCase().trim();
+              return !ftag || ftag!==oldCls;
+            });
+          }
+          C.cls=v;save();
+        },'',{fontSize:'12px'});
+        return clsInp;
+      })()]),
       DIV([LBL('Livello'),NI(C.lv,v=>{C.lv=Math.max(1,Math.min(20,v));if(!C.profManual)C.prof=profByLevel(C.lv);save();render();},1,20,{width:'100%'})]),
       DIV([LBL('Sottoclasse'),TI(C.sub||'',v=>{C.sub=v;save();},'',{fontSize:'12px'})]),
     ],'1fr 1fr 1fr',4));
@@ -1213,6 +1227,14 @@ function pgMain(){
       const clsSel=mk('select',{style:{flex:'1',fontSize:'12px',fontFamily:'var(--ft)',color:'var(--gl)',background:'var(--card)',border:'none',borderBottom:'1px solid var(--border)',outline:'none',minWidth:0}});
       CLASS_LIST.forEach(cn=>{const o=mk('option',{value:cn},[cn]);if(cl.name===cn)o.selected=true;clsSel.appendChild(o);});
       clsSel.addEventListener('change',ev=>{
+        const oldName=(C.classes[ci].customName||C.classes[ci].name||'').toLowerCase().trim();
+        const newName=ev.target.value.toLowerCase().trim();
+        if(oldName && oldName!==newName && C.classFeatures){
+          C.classFeatures=C.classFeatures.filter(f=>{
+            const ftag=(f.tag||'').toLowerCase().trim();
+            return !ftag || ftag!==oldName;
+          });
+        }
         C.classes[ci].name=ev.target.value;
         C.classes[ci].hdType=CLASS_HD[ev.target.value]||'1d8';
         if(ci===0){C.cls=ev.target.value;}
@@ -1246,7 +1268,20 @@ function pgMain(){
       const hdSel=SEL(cl.hdType||'1d8',[['1d6','1d6'],['1d8','1d8'],['1d10','1d10'],['1d12','1d12']],v=>{C.classes[ci].hdType=v;save();},{fontSize:'11px',width:'54px'});
       row.appendChild(hdSel);
       // Elimina
-      row.appendChild(BTN('✕',()=>{C.classes.splice(ci,1);if(C.classes.length===0){C.lv=1;}else{C.lv=C.classes.reduce((s,c)=>s+(Number(c.lv)||0),0);}if(!C.profManual)C.prof=profByLevel(C.lv);save();render();},'ghost sm'));
+      row.appendChild(BTN('✕',()=>{
+        const removedName=(cl.customName||cl.name||'').toLowerCase().trim();
+        C.classes.splice(ci,1);
+        // Rimuovi i privilegi di classe con tag corrispondente alla classe rimossa
+        if(removedName && C.classFeatures){
+          C.classFeatures=C.classFeatures.filter(f=>{
+            const ftag=(f.tag||'').toLowerCase().trim();
+            return !ftag || ftag!==removedName;
+          });
+        }
+        if(C.classes.length===0){C.lv=1;}else{C.lv=C.classes.reduce((s,c)=>s+(Number(c.lv)||0),0);}
+        if(!C.profManual)C.prof=profByLevel(C.lv);
+        save();render();
+      },'ghost sm'));
       classCard.appendChild(row);
     });
     classCard.appendChild(mk('div',{style:{display:'flex',justifyContent:'flex-end',marginTop:'6px',gap:'8px',alignItems:'center'}},[ mk('span',{style:{color:'var(--td)',fontSize:'11px'}},['Livello Totale:']), mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'16px'}},[String(totalLv)]) ]));
@@ -1459,29 +1494,7 @@ function pgMain(){
   ],{gap:'6px',marginTop:'8px',flexWrap:'wrap'}));
   p.appendChild(hdCard);
 
-  // ── Slot Patto (Warlock — Pact Magic) ──
-  const warlockLv=getWarlockLevel();
-  if(warlockLv>0 && !C.showPactMagic){C.showPactMagic=true;save();}
-  if(C.showPactMagic && warlockLv>0){
-    const pactTable=pactMagicTable(warlockLv);
-    if(!C.pactMagic)C.pactMagic={lv:1,m:0,u:0};
-    C.pactMagic.m=pactTable.m;
-    C.pactMagic.lv=pactTable.lv;
-    if(C.pactMagic.u>C.pactMagic.m)C.pactMagic.u=C.pactMagic.m;
-    const pactAvail=Math.max(0,C.pactMagic.m-C.pactMagic.u);
-    const pactCard=CARD([
-      ROW([
-        LBL('🔮 Slot Patto (Warlock)',{marginBottom:'0'}),
-        mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'13px'}},[pactAvail+'/'+C.pactMagic.m+' · Liv. '+C.pactMagic.lv]),
-      ],{justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}),
-      mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginBottom:'6px'}},['Pool separato dagli slot normali. Si ricarica con il Riposo Breve.']),
-      ROW([
-        BTN('Usa Slot',()=>{if(C.pactMagic.u<C.pactMagic.m){C.pactMagic.u++;save();render();}},'gold sm',{style:{flex:'1'}}),
-        BTN('↺ Recupera',()=>{if(C.pactMagic.u>0){C.pactMagic.u--;save();render();}},'sm',{style:{flex:'1',borderColor:'var(--bluel)',color:'var(--bluel)'}}),
-      ],{gap:'6px'})
-    ]);
-    p.appendChild(pactCard);
-  }
+  // Slot Patto Warlock spostati in pgSpells e pgCombat
 
   // Esaurimento
   const exLevels2014=[
@@ -1872,6 +1885,39 @@ function pgCombat(){
     }
     slotGrid.appendChild(btnRow);
     slotCard.appendChild(slotGrid);
+
+    // ── Slot Patto Warlock in Combat ──
+    const wlLvC=getWarlockLevel();
+    if(wlLvC>0){
+      const ptC=pactMagicTable(wlLvC);
+      if(!C.pactMagic)C.pactMagic={lv:1,m:0,u:0};
+      C.pactMagic.m=ptC.m; C.pactMagic.lv=ptC.lv;
+      if(C.pactMagic.u>C.pactMagic.m)C.pactMagic.u=C.pactMagic.m;
+      const pAvail=Math.max(0,C.pactMagic.m-C.pactMagic.u);
+
+      const pHdr=mk('div',{style:{display:'flex',gap:'4px',minWidth:'max-content',marginTop:'8px',borderTop:'1px solid rgba(138,80,192,0.3)',paddingTop:'6px'}});
+      pHdr.appendChild(mk('div',{style:{width:'28px',fontSize:'9px',color:'var(--purl)',display:'flex',alignItems:'center'}},['🔮']));
+      pHdr.appendChild(mk('div',{style:{flex:'1',textAlign:'left',color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'10px',display:'flex',alignItems:'center'}},['Patto Lv '+C.pactMagic.lv]));
+      slotGrid.appendChild(pHdr);
+
+      const pAvailRow=mk('div',{style:{display:'flex',gap:'4px',minWidth:'max-content',marginTop:'3px'}});
+      pAvailRow.appendChild(mk('div',{style:{width:'28px'}}));
+      const pColC=pAvail===0&&C.pactMagic.m>0?'var(--rl)':pAvail<C.pactMagic.m?'#e8a030':'var(--purl)';
+      pAvailRow.appendChild(mk('div',{style:{textAlign:'center',color:pColC,fontFamily:'var(--ft)',fontSize:'13px',flex:'1'}},[String(pAvail)+'/'+String(C.pactMagic.m)]));
+      slotGrid.appendChild(pAvailRow);
+
+      const pBtnRow=mk('div',{style:{display:'flex',gap:'4px',minWidth:'max-content',marginTop:'3px'}});
+      pBtnRow.appendChild(mk('div',{style:{width:'28px'}}));
+      const pCol2=mk('div',{style:{flex:'1',display:'flex',flexDirection:'column',gap:'2px',alignItems:'center'}});
+      const pUsaB=mk('button',{cls:'sm',style:{fontSize:'9px',padding:'1px 3px',width:'80px',opacity:pAvail===0?0.4:1,borderColor:'var(--pur)',color:'var(--purl)'}},['Usa']);
+      pUsaB.addEventListener('click',()=>{if(C.pactMagic.u<C.pactMagic.m){C.pactMagic.u++;save();render();}});
+      const pRecB=mk('button',{cls:'sm ghost',style:{fontSize:'11px',padding:'0 3px',width:'80px',opacity:C.pactMagic.u===0?0.3:1,color:'var(--purl)'}},['↺']);
+      pRecB.addEventListener('click',()=>{if(C.pactMagic.u>0){C.pactMagic.u--;save();render();}});
+      pCol2.appendChild(pUsaB);pCol2.appendChild(pRecB);
+      pBtnRow.appendChild(pCol2);
+      slotGrid.appendChild(pBtnRow);
+    }
+
     p.appendChild(slotCard);
   } else {
     p.appendChild(CARD([slotToggleRow]));
@@ -2207,6 +2253,53 @@ function pgSpells(){
   });
 
   p.appendChild(CARD([LBL('Slot Incantesimi'),slotDiv,resetBtn]));
+
+  // ── Slot Patto Warlock (Pact Magic) — visibile solo se il personaggio ha livelli Warlock ──
+  (()=>{
+    const wlLv=getWarlockLevel();
+    if(wlLv<=0)return;
+    const pactTable=pactMagicTable(wlLv);
+    if(!C.pactMagic)C.pactMagic={lv:1,m:0,u:0};
+    C.pactMagic.m=pactTable.m;
+    C.pactMagic.lv=pactTable.lv;
+    if(C.pactMagic.u>C.pactMagic.m)C.pactMagic.u=C.pactMagic.m;
+    save();
+
+    const pactAvail=Math.max(0,C.pactMagic.m-C.pactMagic.u);
+
+    // Dots slot patto
+    const pactDotsDiv=mk('div',{style:{display:'flex',gap:'3px',flex:'1'}});
+    for(let i=0;i<C.pactMagic.m;i++){
+      pactDotsDiv.appendChild(mk('div',{cls:'slotc'+(i<pactAvail?'':' used')}));
+    }
+    const pactCntEl=mk('span',{style:{color:pactAvail===0&&C.pactMagic.m>0?'var(--rl)':'var(--purl)',fontFamily:'var(--ft)',fontSize:'11px',minWidth:'32px',textAlign:'center'}},[pactAvail+'/'+C.pactMagic.m]);
+
+    function refreshPactRow(){
+      const av=Math.max(0,C.pactMagic.m-C.pactMagic.u);
+      pactCntEl.textContent=av+'/'+C.pactMagic.m;
+      pactCntEl.style.color=av===0&&C.pactMagic.m>0?'var(--rl)':'var(--purl)';
+      pactDotsDiv.innerHTML='';
+      for(let i=0;i<C.pactMagic.m;i++)pactDotsDiv.appendChild(mk('div',{cls:'slotc'+(i<av?'':' used')}));
+    }
+
+    const usaPact=mk('button',{cls:'sm',style:{padding:'1px 6px',fontSize:'10px',opacity:pactAvail===0?0.5:1}},['Usa']);
+    usaPact.addEventListener('click',()=>{if(C.pactMagic.u<C.pactMagic.m){C.pactMagic.u++;save();refreshPactRow();}});
+    const recPact=mk('button',{cls:'sm ghost',style:{padding:'1px 5px',fontSize:'13px',opacity:C.pactMagic.u===0?0.4:1}},['↺']);
+    recPact.addEventListener('click',()=>{if(C.pactMagic.u>0){C.pactMagic.u--;save();refreshPactRow();}});
+
+    const pactRow=mk('div',{cls:'row',style:{marginBottom:'5px',borderTop:'1px solid rgba(138,80,192,0.3)',paddingTop:'6px',marginTop:'4px'}});
+    pactRow.appendChild(mk('span',{style:{color:'var(--purl)',fontFamily:'var(--ft)',fontSize:'10px',width:'30px',flexShrink:0}},['🔮 P']));
+    pactRow.appendChild(pactDotsDiv);
+    pactRow.appendChild(pactCntEl);
+    pactRow.appendChild(usaPact);
+    pactRow.appendChild(recPact);
+    pactRow.appendChild(mk('span',{style:{color:'var(--tk)',fontSize:'10px',flexShrink:0}},['Lv '+C.pactMagic.lv]));
+
+    const pactNote=mk('div',{style:{color:'var(--tk)',fontSize:'10px',marginTop:'4px'}},['🔮 Slot Patto Warlock (Lv '+C.pactMagic.lv+') — si ricaricano col Riposo Breve']);
+    const resetPactBtn=mk('button',{cls:'sm',style:{width:'100%',marginTop:'6px',color:'var(--purl)',borderColor:'var(--pur)',background:'rgba(74,32,128,0.1)'}},['↺ Riposo Breve — Recupera slot patto']);
+    resetPactBtn.addEventListener('click',()=>{C.pactMagic.u=0;save();refreshPactRow();});
+    p.appendChild(CARD([LBL('🔮 Slot Patto Warlock'),pactRow,pactNote,resetPactBtn],{border:'1px solid rgba(138,80,192,0.4)'}));
+  })();
 
   // Aggiungi con ricerca autocomplete
   let newLv=0,newN='';
