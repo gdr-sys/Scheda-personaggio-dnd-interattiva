@@ -376,6 +376,7 @@ const DEF={
   showCompanions:false,
   companions:[],
   showWildshape:false,
+  raging:false,
   wildshapes:[],
   wsUses:{cur:2,max:2},
   spellCategories:[],  // categorie custom per incantesimi in Combat: [{key,label,color}]
@@ -573,11 +574,17 @@ function showAttackRoll(atk, isSpell){
   const dmgExtra=Number(atk.ex)||0;
   const dmgDice=atk.dmg||'1d6';
 
+  // Rage bonus (solo corpo a corpo, solo se in furia, solo Barbaro)
+  const _rageRes=C.raging&&C.res?C.res.find(r=>r._scalingKey==='rage'):null;
+  const _rageDmg=_rageRes?parseInt((_rageRes.die||'+2').replace(/[^0-9]/g,''))||2:0;
+  const _isRaging=!!C.raging && _rageDmg>0 && !isSpell && !(atk.ranged);
+
   let dmgFormula=dmgDice;
   if(dmgMod>0)dmgFormula+='+'+dmgMod;
   else if(dmgMod<0)dmgFormula+=dmgMod;
   if(dmgExtra>0)dmgFormula+='+'+dmgExtra;
   else if(dmgExtra<0)dmgFormula+=dmgExtra;
+  if(_isRaging)dmgFormula+='+'+_rageDmg;
 
   // Tiro danni
   let dmgResult, critResult=null;
@@ -624,8 +631,10 @@ function showAttackRoll(atk, isSpell){
   } else {
     dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['DANNI']));
     dmgCol.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(dmgResult.t)]));
-    const dmgBreak=dmgFormula+' → ['+dmgResult.r.join(',')+']';
-    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px'}},[dmgBreak]));
+    let dmgBreak=dmgFormula+' → ['+dmgResult.r.join(',')+']';
+    if(_isRaging)dmgBreak+='
++'+_rageDmg+' (Furia)';
+    dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px',whiteSpace:'pre-line'}},[dmgBreak]));
   }
   row.appendChild(dmgCol);
   p.appendChild(row);
@@ -1436,6 +1445,11 @@ function pgMain(){
               return !ftag || ftag!==oldCls;
             });
           }
+          // Disattiva Forma Selvatica se si rimuove Druido in modalità singola classe
+          if(oldCls==='druido' && newCls!=='druido' && (!C.classes||C.classes.length===0)){
+            C.showWildshape=false;C.wsUses={cur:2,max:2};
+          }
+          if(newCls==='druido')C.showWildshape=true;
           C.cls=v;save();
         },'',{fontSize:'12px'});
         return clsInp;
@@ -1459,10 +1473,16 @@ function pgMain(){
             return !ftag || ftag!==oldName;
           });
         }
+        const prevName=(C.classes[ci].customName||C.classes[ci].name||'').toLowerCase().trim();
         C.classes[ci].name=ev.target.value;
         C.classes[ci].hdType=CLASS_HD[ev.target.value]||'1d8';
         if(ci===0){C.cls=ev.target.value;}
-        if(ev.target.value==='Druido')C.showWildshape=true;
+        if(ev.target.value==='Druido'){C.showWildshape=true;}
+        else if(prevName==='druido'){
+          // Controllare se altri slot hanno ancora Druido
+          const stillHas=C.classes.some(c=>(c.name||'').toLowerCase()==='druido'||(c.customName||'').toLowerCase()==='druido');
+          if(!stillHas){C.showWildshape=false;C.wsUses={cur:2,max:2};}
+        }
         save();render();
       });
       row.appendChild(clsSel);
@@ -1502,6 +1522,9 @@ function pgMain(){
             return !ftag || ftag!==removedName;
           });
         }
+        // Disattiva Forma Selvatica se non ci sono più Druidi
+        const stillHasDruido=C.classes.some(c=>(c.name||'').toLowerCase()==='druido'||(c.customName||'').toLowerCase()==='druido');
+        if(!stillHasDruido && removedName==='druido'){C.showWildshape=false;C.wsUses={cur:2,max:2};}
         if(C.classes.length===0){C.lv=1;}else{C.lv=C.classes.reduce((s,c)=>s+(Number(c.lv)||0),0);}
         if(!C.profManual)C.prof=profByLevel(C.lv);
         save();render();
@@ -2473,6 +2496,40 @@ function pgCombat(){
     });
     return sec;
   }
+  // ── Rage toggle (solo Barbaro) ──
+  if(getClassLevel('Barbaro')>0){
+    const rageRes=C.res&&C.res.find(r=>r._scalingKey==='rage');
+    const rageDmg=rageRes?parseInt((rageRes.die||'+2').replace(/[^0-9]/g,''))||2:2;
+    const isRaging=!!C.raging;
+    const rageUsesLeft=rageRes?rageRes.cur||0:0;
+    const rageMax=rageRes?rageRes.max||2:2;
+
+    const rageCard=CARD([
+      ROW([
+        mk('span',{style:{color:isRaging?'var(--rl)':'var(--td)',fontFamily:'var(--ft)',fontSize:'12px',letterSpacing:'1px',flex:'1'}},
+          [isRaging?'⚡ IN FURIA':'⚡ FURIA']),
+        mk('span',{style:{color:'var(--tk)',fontSize:'10px',marginRight:'8px'}},[rageUsesLeft+'/'+rageMax+' usi']),
+        BTN(isRaging?'Termina':'Entra in Furia',()=>{
+          if(!isRaging){
+            if(rageRes&&rageRes.cur>0){rageRes.cur--;save();}
+          }
+          C.raging=!isRaging;save();render();
+        },isRaging?'sm':'gold sm'),
+      ],{justifyContent:'space-between',alignItems:'center',gap:'6px'}),
+      isRaging?ROW([
+        mk('span',{style:{color:'var(--rl)',fontSize:'10px'}},
+          ['+'+rageDmg+' danno corpo a corpo']),
+        mk('span',{style:{color:'var(--tk)',fontSize:'10px'}},
+          ['Res.: Contundente · Perforante · Tagliente']),
+      ],{gap:'12px',marginTop:'6px',flexWrap:'wrap'}):mk('span',{},[]),
+    ],{
+      border:isRaging?'1px solid var(--rl)':'1px solid var(--border)',
+      background:isRaging?'rgba(180,30,30,0.08)':'',
+      marginBottom:'8px'
+    });
+    p.appendChild(rageCard);
+  }
+
   p.appendChild(atkSection(C.wa,'wa','⚔ Attacchi con Armi'));
 
   // ── Sezioni Incantesimi (fisse + categorie custom) — solo se hanno incantesimi dentro ──
