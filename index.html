@@ -640,8 +640,7 @@ function showAttackRoll(atk, isSpell){
     dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'10px',marginBottom:'2px'}},['DANNI']));
     dmgCol.appendChild(mk('div',{style:{color:'var(--rl)',fontFamily:'var(--ft)',fontSize:'24px',lineHeight:'1'}},[String(dmgResult.t)]));
     let dmgBreak=dmgFormula+' → ['+dmgResult.r.join(',')+']';
-    if(_isRaging)dmgBreak+='
-+'+_rageDmg+' (Furia)';
+    if(_isRaging)dmgBreak+='\n+'+_rageDmg+' (Furia)';
     dmgCol.appendChild(mk('div',{style:{color:'var(--td)',fontSize:'9px',marginTop:'2px',whiteSpace:'pre-line'}},[dmgBreak]));
   }
   row.appendChild(dmgCol);
