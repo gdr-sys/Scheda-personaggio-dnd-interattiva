@@ -465,6 +465,14 @@ function getWarlockLevel(){
   }
   return (C.cls||'').toLowerCase()==='warlock'?(C.lv||0):0;
 }
+// Globale — usata da pgMain, pgCombat, showAttackRoll e altri
+function getClassLevel(className){
+  if(C.classes&&C.classes.length>0){
+    const cl=C.classes.find(c=>c.name===className);
+    return cl?Number(cl.lv)||0:0;
+  }
+  return (C.cls||'').toLowerCase()===className.toLowerCase()?(C.lv||0):0;
+}
 function fm(n){return n>=0?'+'+n:''+n;}
 // Recupera le risorse che si ricaricano con il tipo di riposo specificato ('short' o 'long')
 function rechargeResources(restType){
@@ -1806,13 +1814,7 @@ function pgMain(){
     }
   }
   const SM_cha=sm(C.cha);
-  function getClassLevel(className){
-    if(C.classes&&C.classes.length>0){
-      const cl=C.classes.find(c=>c.name===className);
-      return cl?Number(cl.lv)||0:0;
-    }
-    return (C.cls||'').toLowerCase()===className.toLowerCase()?(C.lv||0):0;
-  }
+  // getClassLevel è ora globale
   const bardLv=getClassLevel('Bardo');
   const isBardo=bardLv>0;
   // Cerca la classe Guerriero (in qualunque posizione nel multiclasse) e legge la SUA sottoclasse
