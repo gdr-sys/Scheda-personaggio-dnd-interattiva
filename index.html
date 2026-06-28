@@ -1846,12 +1846,17 @@ function pgMain(){
     DIV([LBL('CA'),mk('div',{id:'ac-total',style:{fontSize:'26px',color:'var(--gl)',fontFamily:'var(--ft)',textAlign:'center'}},[String(acT)]),LBL('Base',{marginTop:'2px'}),(()=>{const i=mk('input',{type:'text',value:String(C.bac||10),style:{width:'100%',textAlign:'center'}});i.addEventListener('change',ev=>{C.bac=Number(ev.target.value)||10;const t=(C.bac||10)+(C.acm||[]).filter(m=>m.on).reduce((a,m)=>a+(Number(m.v)||0),0);const el=document.getElementById('ac-total');if(el)el.textContent=String(t);save();});return i;})()],{style:{textAlign:'center',minWidth:'65px'}}),
     DIV([
       ROW([LBL('Mod CA'),BTN('+',()=>{C.acm.push({n:'Scudo',v:2,on:false});save();render();},'sm')],{justifyContent:'space-between',alignItems:'center'}),
-      ...(C.acm||[]).map((m,i)=>ROW([
-        CHK(!!m.on,v=>{C.acm[i].on=v;save();render();}),
-        TI(m.n||'',v=>{C.acm[i].n=v;save();},'',{flex:'1',fontSize:'12px'}),
-        (()=>{const inp=mk('input',{type:'number',value:String(m.v||0),style:{width:'52px',textAlign:'center',padding:'6px 4px',border:'1px solid var(--border)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--text)',fontSize:'14px',boxSizing:'border-box'}});inp.addEventListener('input',ev=>{C.acm[i].v=Number(ev.target.value)||0;save();const t=(C.bac||10)+(C.acm||[]).filter(m=>m.on).reduce((a,m)=>a+(Number(m.v)||0),0);const el=document.getElementById('ac-total');if(el)el.textContent=String(t);});return inp;})(),
-        BTN('✕',()=>{C.acm.splice(i,1);save();render();},'ghost sm')
-      ],{marginTop:'4px'}))
+      ...(C.acm||[]).map((m,i)=>{
+        const calcAc=()=>{const t=(C.bac||10)+(C.acm||[]).filter(m=>m.on).reduce((a,m)=>a+(Number(m.v)||0),0);const el=document.getElementById('ac-total');if(el)el.textContent=String(t);};
+        const acvInp=mk('input',{type:'number',value:String(m.v||0),style:{width:'56px',textAlign:'center',padding:'6px 4px',border:'1px solid var(--border)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--text)',fontSize:'15px',boxSizing:'border-box',flexShrink:'0'}});
+        acvInp.addEventListener('input',ev=>{C.acm[i].v=Number(ev.target.value)||0;save();calcAc();});
+        return ROW([
+          CHK(!!m.on,v=>{C.acm[i].on=v;save();calcAc();}),
+          TI(m.n||'',v=>{C.acm[i].n=v;save();},'Nome modificatore',{flex:'1',fontSize:'14px',minWidth:'0'}),
+          acvInp,
+          BTN('✕',()=>{C.acm.splice(i,1);save();render();},'ghost sm')
+        ],{marginTop:'6px',gap:'6px',alignItems:'center'});
+      })
     ],{style:{flex:'1',marginLeft:'10px'}})
   ],{alignItems:'flex-start'})]);
   p.appendChild(caCard);
@@ -2558,12 +2563,17 @@ function pgCombat(){
     acModsDiv.innerHTML='';
     acModsDiv.appendChild(ROW([LBL('Modificatori CA'),BTN('+',()=>{C.acm.push({n:'Scudo',v:2,on:false});save();refreshAcPanel();refreshAcMods();},'sm')],{justifyContent:'space-between',alignItems:'center'}));
     (C.acm||[]).forEach((m,i)=>{
+      // Numero libero per il valore
+      const acvInp=mk('input',{type:'number',value:String(m.v||0),style:{width:'56px',textAlign:'center',padding:'6px 4px',border:'1px solid var(--border)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--text)',fontSize:'15px',boxSizing:'border-box',flexShrink:'0'}});
+      acvInp.addEventListener('input',ev=>{C.acm[i].v=Number(ev.target.value)||0;save();refreshAcPanel();});
+      // Riga: [check] [nome — full width] [valore] [✕]
+      const nameInp=TI(m.n||'',v=>{C.acm[i].n=v;save();},'Nome modificatore',{flex:'1',fontSize:'14px',minWidth:'0'});
       acModsDiv.appendChild(ROW([
         CHK(!!m.on,v=>{C.acm[i].on=v;save();refreshAcPanel();}),
-        TI(m.n||'',v=>{C.acm[i].n=v;save();},'',{flex:'1',fontSize:'12px'}),
-        (()=>{const inp=mk('input',{type:'number',value:String(m.v||0),style:{width:'52px',textAlign:'center',padding:'6px 4px',border:'1px solid var(--border)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--text)',fontSize:'14px',boxSizing:'border-box'}});inp.addEventListener('input',ev=>{C.acm[i].v=Number(ev.target.value)||0;save();refreshAcPanel();});return inp;})(),
+        nameInp,
+        acvInp,
         BTN('✕',()=>{C.acm.splice(i,1);save();refreshAcPanel();refreshAcMods();},'ghost sm')
-      ],{marginTop:'4px'}));
+      ],{marginTop:'6px',gap:'6px',alignItems:'center'}));
     });
   }
   const caCol=mk('div',{style:{textAlign:'center',minWidth:'70px'}},[LBL('CA Totale'),acTotalEl,LBL('Base',{marginTop:'2px'}),NI(C.bac||10,v=>{C.bac=v;save();refreshAcPanel();},undefined,undefined,{width:'100%'})]);
