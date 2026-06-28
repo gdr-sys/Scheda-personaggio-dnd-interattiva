@@ -30,11 +30,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);overflow-x:hid
 input,textarea,select{background:rgba(0,0,0,0.07);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--fb);font-size:14px;padding:4px 8px;outline:none;width:100%}body.light input,body.light textarea,body.light select{background:rgba(255,255,255,0.7)}
 input[type=number]{width:52px;text-align:center;padding:4px 2px;-moz-appearance:textfield;box-sizing:border-box}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.ni-wrap{display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--card)}
-.ni-wrap input{border:none;background:transparent;min-width:44px;width:44px;padding:4px 2px;text-align:center;font-size:13px;color:var(--text);-moz-appearance:textfield}
-.ni-wrap input::-webkit-inner-spin-button,.ni-wrap input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.ni-btn{background:none;border:none;border-radius:0;color:var(--td);font-size:14px;line-height:1;padding:4px 6px;cursor:pointer;flex-shrink:0;min-width:26px;text-align:center;user-select:none}
-.ni-btn:active{background:var(--border)}
+input[type=number]{width:58px;text-align:center;padding:4px 6px 4px 6px;box-sizing:border-box}
+input[type=number]::-webkit-inner-spin-button{opacity:1;margin-left:4px;height:24px;cursor:pointer}
 textarea{resize:vertical;min-height:60px;font-family:var(--fb)}
 select option{background:var(--card)}
 button{background:var(--card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--fb);font-size:13px;padding:5px 12px;cursor:pointer;flex-shrink:0}body.light .irow,body.light .srow,body.light .mgrow{background:rgba(255,255,255,0.4)}
@@ -1011,49 +1008,12 @@ function TA(val,cb,ph,st){
   return el;
 }
 function NI(val,cb,mn,mx,st){
-  // Number input custom con pulsanti − + per evitare problemi con frecce native su mobile
-  const wrap=mk('div',{cls:'ni-wrap'});
-  // Applica eventuali stili personalizzati al wrapper (width, ecc.)
-  if(st){
-    const wrapSt={};
-    const inpSt={};
-    // Separa gli stili: width/flex/etc vanno al wrapper, font/color vanno all'input
-    for(const[k,v] of Object.entries(st)){
-      if(['fontSize','color','fontFamily','textAlign'].includes(k))inpSt[k]=v;
-      else wrapSt[k]=v;
-    }
-    Object.assign(wrap.style,wrapSt);
-    var extraInpSt=inpSt;
-  } else { var extraInpSt={}; }
-
-  const minusBtn=mk('button',{cls:'ni-btn',title:'Diminuisci'},['−']);
-  const el=mk('input',{type:'number',value:val??0,style:{...extraInpSt}});
-  const plusBtn=mk('button',{cls:'ni-btn',title:'Aumenta'},['+']);
-
+  // Number input — input nativo con frecce browser
+  const el=mk('input',{type:'number',value:val??0,style:{width:'58px',textAlign:'center',padding:'4px 6px',boxSizing:'border-box',...(st||{})}});
   if(mn!=null)el.min=mn;
   if(mx!=null)el.max=mx;
-
-  function clamp(v){
-    if(mn!=null&&v<mn)v=mn;
-    if(mx!=null&&v>mx)v=mx;
-    return v;
-  }
-  minusBtn.addEventListener('click',ev=>{
-    ev.preventDefault();ev.stopPropagation();
-    const v=clamp((Number(el.value)||0)-1);
-    el.value=v;cb(v);
-  });
-  plusBtn.addEventListener('click',ev=>{
-    ev.preventDefault();ev.stopPropagation();
-    const v=clamp((Number(el.value)||0)+1);
-    el.value=v;cb(v);
-  });
-  el.addEventListener('input',ev=>cb(clamp(Number(ev.target.value)||0)));
-
-  wrap.appendChild(minusBtn);
-  wrap.appendChild(el);
-  wrap.appendChild(plusBtn);
-  return wrap;
+  el.addEventListener('input',ev=>cb(Number(ev.target.value)));
+  return el;
 }
 function SEL(val,opts,cb,st){
   // Select - triggers render after change (layout may change)
