@@ -190,7 +190,9 @@ body.light .nb.on::after{background:var(--gd);box-shadow:none}
 .rpop{position:fixed;bottom:80px;right:12px;background:var(--card);border:1px solid var(--gold);border-radius:12px;z-index:9999;text-align:left;min-width:240px;width:min(340px,calc(100vw - 24px));max-height:55vh;display:none;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.7),var(--glow)}
 
 .irow{background:rgba(0,0,0,0.2);border:1px solid rgba(92,64,32,0.6);border-radius:6px;margin-bottom:6px;padding:10px}
-.srow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(90,62,27,.2)}
+.srow{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid rgba(90,62,27,.2)}
+.srow-top{display:flex;align-items:center;gap:6px;width:100%}
+.srow-bot{display:flex;align-items:center;gap:4px;width:100%}
 .mgrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(90,62,27,.2)}
 
 .chkb{
@@ -2992,11 +2994,11 @@ function pgSpells(){
   }
 
   const scaCard=CARD([
-    ROW([LBL('Caratteristica Incantatore'),SEL(C.sca,scaOpts,v=>{C.sca=v;save();render();},{})],{gap:'8px',marginBottom:'8px',alignItems:'center'}),
-    GRID([
-      modSection('DC Incantesimi','dcMods','dcMods',dcTotal,dcBase),
-      modSection('Bonus Attacco','attMods','attMods',attTotal,attBase),
-    ],'1fr 1fr',10)
+    ROW([LBL('Caratteristica Incantatore'),SEL(C.sca,scaOpts,v=>{C.sca=v;save();render();},{})],{gap:'8px',marginBottom:'10px',alignItems:'center'}),
+    mk('div',{style:{display:'flex',flexDirection:'column',gap:'12px'}},
+      [modSection('DC Incantesimi','dcMods','dcMods',dcTotal,dcBase),
+       modSection('Bonus Attacco','attMods','attMods',attTotal,attBase)]
+    )
   ]);
   p.appendChild(scaCard);
 
@@ -3170,8 +3172,19 @@ function pgSpells(){
       const i=(C.cn||[]).indexOf(s);
       const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let d=cu||db;if(cu&&!d.da&&!d.sv&&d.de){const auto=autoDetectSpellDice(d.de);d={...d,da:d.da||auto.da,daHigher:d.daHigher||auto.daHigher,sv:d.sv||auto.sv};}
       const row=mk('div',{cls:'srow'});
-      // Categoria per Combat (trucchetti sempre visibili, basta la categoria)
-      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'78px'}});
+      // Riga superiore: nome + badge + dado
+      const top=mk('div',{cls:'srow-top'});
+      const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'15px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted',minWidth:'0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}});
+      nm.textContent=cu?.it||d?.it||s.n;
+      nm.addEventListener('click',()=>showSpellModal(s.n));
+      top.appendChild(nm);
+      if(d?.ca)top.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
+      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 4px',fontSize:'10px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:cu?.it||d?.it||s.n,dur:d?.du||''};save();render();});top.appendChild(cb);}
+      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(cu?.it||d?.it||s.n,d?.da||null,d?.sv||null,0,d?.daHigher||null,true),'gold sm',{style:{padding:'2px 7px',fontSize:'12px',flexShrink:'0'}});top.appendChild(diceBtn);}
+      row.appendChild(top);
+      // Riga inferiore: categoria + componenti + ✕
+      const bot=mk('div',{cls:'srow-bot'});
+      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'2px 4px',fontSize:'11px',flex:'1',minWidth:'0'}});
       buildSpellCatOptions(s.cat||'',catSel);
       catSel.addEventListener('change',ev=>{
         if(ev.target.value==='__new__'){
@@ -3181,17 +3194,10 @@ function pgSpells(){
         }
         C.cn[i].cat=ev.target.value;save();
       });
-      row.appendChild(catSel);
-      const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted'}});
-      nm.textContent=cu?.it||d?.it||s.n;
-      nm.addEventListener('click',()=>showSpellModal(s.n));
-      row.appendChild(nm);
-      if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
-      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:cu?.it||d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
-      if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
-      // Dado danni/CD se applicabile
-      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(cu?.it||d?.it||s.n,d?.da||null,d?.sv||null,0,d?.daHigher||null,true),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
-      row.appendChild(BTN('✕',()=>{C.cn.splice(i,1);save();render();},'ghost sm'));
+      bot.appendChild(catSel);
+      if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{bot.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});}
+      bot.appendChild(BTN('✕',()=>{C.cn.splice(i,1);save();render();},'ghost sm',{style:{marginLeft:'auto'}}));
+      row.appendChild(bot);
       tCard.appendChild(row);
     });
     p.appendChild(tCard);
@@ -3206,10 +3212,21 @@ function pgSpells(){
       const i=(C.sl[l]||[]).indexOf(s);
       const db=lkS(s.n);const cu=(C.csp||{})[(s.n||'').toLowerCase()]||null;let d=cu||db;if(cu&&!d.da&&!d.sv&&d.de){const auto=autoDetectSpellDice(d.de);d={...d,da:d.da||auto.da,daHigher:d.daHigher||auto.daHigher,sv:d.sv||auto.sv};}
       const row=mk('div',{cls:'srow'});
+      // Riga superiore: nome incantesimo + badge + dado
+      const top=mk('div',{cls:'srow-top'});
+      const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'15px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted',minWidth:'0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}});
+      nm.textContent=cu?.it||d?.it||s.n;
+      nm.addEventListener('click',()=>showSpellModal(s.n));
+      top.appendChild(nm);
+      if(d?.ca)top.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
+      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 4px',fontSize:'10px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:cu?.it||d?.it||s.n,dur:d?.du||''};save();render();});top.appendChild(cb);}
+      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(cu?.it||d?.it||s.n,d?.da||null,d?.sv||null,l,d?.daHigher||null,false),'gold sm',{style:{padding:'2px 7px',fontSize:'12px',flexShrink:'0'}});top.appendChild(diceBtn);}
+      row.appendChild(top);
+      // Riga inferiore: check + categoria + componenti + ✕
+      const bot=mk('div',{cls:'srow-bot'});
       const chkEl=CHK(!!s.pr,v=>{C.sl[l][i].pr=v;save();render();});
-      row.appendChild(chkEl);
-      // Categoria per Combat
-      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'1px 2px',fontSize:'10px',width:'78px'}});
+      bot.appendChild(chkEl);
+      const catSel=mk('select',{style:{background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'2px 4px',fontSize:'11px',flex:'1',minWidth:'0'}});
       buildSpellCatOptions(s.cat||'',catSel);
       catSel.addEventListener('change',ev=>{
         if(ev.target.value==='__new__'){
@@ -3219,17 +3236,10 @@ function pgSpells(){
         }
         C.sl[l][i].cat=ev.target.value;save();
       });
-      row.appendChild(catSel);
-      const nm=mk('span',{style:{flex:'1',color:d?'var(--gl)':'var(--text)',fontFamily:'var(--fb)',fontSize:'13px',cursor:'pointer',textDecoration:d?'underline':'none',textDecorationStyle:'dotted'}});
-      nm.textContent=cu?.it||d?.it||s.n;
-      nm.addEventListener('click',()=>showSpellModal(s.n));
-      row.appendChild(nm);
-      if(d?.ca)row.appendChild(mk('span',{cls:caCls[d.ca]||'cbA'},[d.ca]));
-      if(d?.du&&d.du.includes('Conc')){const cb=mk('span',{style:{background:'rgba(26,58,107,0.3)',border:'1px solid var(--blue)',color:'var(--bluel)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace',cursor:'pointer'},title:'Clicca per attivare concentrazione'},['C']);cb.addEventListener('click',()=>{C.concentration={name:cu?.it||d?.it||s.n,dur:d?.du||''};save();render();});row.appendChild(cb);}
-      if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{row.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});};
-      // Dado danni/CD
-      if(d?.da||d?.sv){const diceBtn=BTN('⚄',()=>showSpellRollPopup(cu?.it||d?.it||s.n,d?.da||null,d?.sv||null,l,d?.daHigher||null,false),'gold sm',{style:{padding:'1px 5px',fontSize:'11px'}});row.appendChild(diceBtn);}
-      row.appendChild(BTN('✕',()=>{C.sl[l].splice(i,1);save();render();},'ghost sm'));
+      bot.appendChild(catSel);
+      if(d?.co){d.co.split(',').map(c=>c.trim()).filter(Boolean).forEach(c=>{bot.appendChild(mk('span',{style:{background:'rgba(90,62,27,0.2)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'3px',padding:'0 3px',fontSize:'9px',fontFamily:'monospace'}},[c]));});}
+      bot.appendChild(BTN('✕',()=>{C.sl[l].splice(i,1);save();render();},'ghost sm',{style:{marginLeft:'auto'}}));
+      row.appendChild(bot);
       lCard.appendChild(row);
     });
     p.appendChild(lCard);
