@@ -25,4 +25,4 @@ Progetto in sviluppo continuo, aggiornato in base alle esigenze reali emerse al 
 
 ## 📜 Licenza
 
-Questo progetto utilizza contenuti tratti dal System Reference Document (SRD) di D&D 5e, rilasciato da Wizards of the Coast sotto licenza apposita. Verifica i termini di licenza applicabili (OGL/ORC a seconda dell'edizione) prima di un utilizzo commerciale.
+Questo progetto utilizza contenuti tratti dal System Reference Document (SRD) di D&D 5e, rilasciato da Wizards of the Coast sotto licenza apposita. 
