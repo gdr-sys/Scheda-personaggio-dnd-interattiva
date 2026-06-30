@@ -1,145 +1,28 @@
 # Scheda Personaggio D&D 5e Interattiva
 
-Applicazione web interattiva per la gestione completa di personaggi di Dungeons & Dragons 5e.
+Una scheda personaggio digitale per **Dungeons & Dragons 5ª edizione** (compatibile sia con il regolamento 2014 che 2024), pensata per essere usata da mobile durante le sessioni di gioco. Nessuna installazione richiesta: è una singola pagina HTML che gira interamente nel browser.
 
-Il progetto è una single-page web app pensata per essere utilizzata direttamente dal browser, senza installazione e senza backend.
+## ✨ Caratteristiche principali
 
----
+- **Multiclasse completo** — gestisci più classi contemporaneamente, con calcolo automatico di livello totale, dadi vita e competenze
+- **Risorse di classe automatiche** — Ispirazione Bardica, Dadi Superiorità, Punti Stregoneria, Channel Divinity, Punti Ki/Disciplina, Second Wind, Action Surge, Furia, Lay on Hands: si creano, scalano col livello e si rimuovono da sole quando aggiungi o togli una classe
+- **Slot incantesimo e slot patto (Warlock)** — gestiti come pool separati, integrati sia nella pagina Incantesimi che in Combattimento, con recupero automatico su riposo breve/lungo
+- **Flexible Casting** — conversione rapida slot ↔ punti stregoneria per lo Stregone
+- **Forma Selvatica** — tracker usi dedicato per il Druido, con differenze tra edizione 2014 e 2024
+- **Popup di tiro integrati** — attacchi, incantesimi, tiri salvezza e abilità con calcolo automatico di bonus, critici, Attacco Furtivo (Ladro) e Divine Smite (Paladino)
+- **Gestione concentrazione** — promemoria automatico del TS quando subisci danno, con rottura automatica in caso di fallimento o di PF a 0, e supporto per l'Ispirazione (vantaggio in 2014, ritiro in 2024)
+- **Compatibilità SRD 2014/2024** — un toggle nelle Impostazioni adatta automaticamente le formule che cambiano tra le due edizioni
+- **Pagine dedicate** — Principale, Abilità, Combattimento, Companion, Forma Selvatica, Incantesimi, Privilegi, Combo, Inventario, Personalità, Diario, Mondo, Homebrew, Impostazioni
+- **Salvataggio cloud** — autenticazione e sincronizzazione tramite Supabase, con possibilità di gestire più schede personaggi
 
-## Link applicazione
+## 📱 Pensata per il mobile
 
-https://gdr-sys.github.io/Scheda-personaggio-dnd-interattiva/
+L'interfaccia è ottimizzata per schermi di telefono durante le sessioni di gioco dal vivo: testo leggibile, campi numerici ampi, popup dei tiri sempre richiudibili, e una struttura a schede per non perdere mai il filo del combattimento.
 
----
+## ⚠️ Stato del progetto
 
-## Descrizione
+Progetto in sviluppo continuo, aggiornato in base alle esigenze reali emerse al tavolo di gioco. Eventuali bug o richieste di funzionalità sono benvenuti.
 
-Questa applicazione permette di gestire in modo completo una scheda personaggio D&D 5e, includendo:
+## 📜 Licenza
 
-- statistiche e bonus
-- combattimento
-- incantesimi
-- inventario
-- condizioni
-- worldbuilding
-- combo di azioni
-- strumenti avanzati per gestione sessione
-
-Tutto viene salvato automaticamente nel browser.
-
----
-
-## Funzionalità principali
-
-### Personaggio
-- Creazione e gestione completa del personaggio
-- Statistiche base e modificatori
-- Calcolo automatico bonus e valori derivati
-
-### Combattimento
-- Tiro iniziativa cliccabile
-- Attacchi con calcolo hit/danni
-- Gestione critici
-- Attacchi magici e fisici separati
-
-### Incantesimi
-- Slot da livello 0 a 9
-- Trucchetti separati
-- Calcolo DC incantesimi
-- Bonus attacco magico
-- Gestione concentrazione
-
-### Inventario
-- Monete (CP, SP, GP, EP, PP)
-- Armi, armature e oggetti
-- Oggetti magici con attunement
-- Gestione quantità e peso
-
-### Condizioni
-- Supporto condizioni D&D 2014 e 2024
-- Visualizzazione dettagliata
-- Attivazione e rimozione dinamica
-
-### Combo system
-- Sequenze di azioni personalizzate
-- Integrazione incantesimi + azioni
-- Gestione turni (azione, bonus, reazione)
-- Controllo concentrazione
-
-### Worldbuilding
-- Gestione PNG incontrati
-- Gestione luoghi e informazioni
-- Note narrative
-
-### Homebrew
-- Sezioni personalizzate
-- Tracker attività con progress bar
-
-### Export / Import
-- Esportazione completa in JSON
-- Importazione personaggi
-- Backup manuale
-
----
-
-## Come si usa
-
-1. Aprire il link dell’applicazione
-2. Creare un nuovo personaggio
-3. Compilare le sezioni (statistiche, abilità, incantesimi, inventario)
-4. Utilizzare le funzioni di combattimento durante il gioco
-5. I dati vengono salvati automaticamente nel browser
-
----
-
-## Salvataggio dati
-
-- Tutti i dati vengono salvati automaticamente in localStorage
-- Nessun server o account richiesto
-- Possibilità di esportare il personaggio in JSON
-- Possibilità di importare backup salvati
-
----
-
-## Requisiti
-
-- Browser moderno (Chrome, Firefox, Edge, Safari)
-- JavaScript attivo
-- Nessuna installazione richiesta
-
----
-
-## Installazione locale (opzionale)
-
-Se si vuole eseguire il progetto in locale:
-
-1. Scaricare il repository
-2. Aprire `index.html` nel browser
-
-Non è necessario alcun server.
-
----
-
-## Tecnologie utilizzate
-
-- HTML5
-- CSS3 (custom properties, tema chiaro/scuro)
-- JavaScript vanilla (senza framework)
-- LocalStorage per persistenza dati
-
----
-
-## Architettura del progetto
-
-Il progetto è basato su una struttura state-driven:
-
-- `C` → stato globale del personaggio
-- `render()` → aggiorna l’interfaccia utente
-- `mk()` → helper per creazione elementi DOM
-- `save()` → salvataggio automatico dati
-
----
-
-## Note
-
-Il progetto è pensato come strumento leggero, veloce e completamente offline-friendly per sessioni di gioco D&D.
+Questo progetto utilizza contenuti tratti dal System Reference Document (SRD) di D&D 5e, rilasciato da Wizards of the Coast sotto licenza apposita. Verifica i termini di licenza applicabili (OGL/ORC a seconda dell'edizione) prima di un utilizzo commerciale.
