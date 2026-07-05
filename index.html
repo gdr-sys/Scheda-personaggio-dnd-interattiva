@@ -537,7 +537,7 @@ const DEF={
   cn:[],sl:{1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[],9:[]},
   res:[],ins:0,maxIns:1,ds:0,df:0,te:[],
   concentration:null, // {name, duration} incantesimo in concentrazione
-  resistances:[], immunities:[], vulnerabilities:[],
+  resistances:[], immunities:[], vulnerabilities:[], condImmunities:[],
   showXpTracker:false, xpTarget:0,
   pt:"",id:"",bo:"",fl:"",app:"",bs:"",nt:"",img:"",
   coins:{pp:0,gp:0,ep:0,sp:0,cp:0,coinsBag:false},
@@ -2928,7 +2928,8 @@ function pgCombat(){
   p.appendChild(buildConditionsCard());
 
   // ── Resistenze, Immunità, Vulnerabilità ──
-  const DAMAGE_TYPES=['Acido','Freddo','Fuoco','Fulmine','Forza','Necrotici','Radianti','Psichici','Sonoro','Tuono','Veleno','Perforanti','Taglienti','Contundenti','Non magici P/T/C'];
+  const DAMAGE_TYPES=['Acido','Freddo','Fuoco','Fulmine','Forza','Necrotici','Radianti','Psichici','Sonoro','Tuono','Veleno','Perforanti','Taglienti','Contundenti','Non magici P/T/C','Veleno Psichico'];
+  const CONDITION_TYPES=['Accecato','Affascinato','Afferrato','Ammaliato','Assordato','Avvelenato','Esaurito','Incapacitato','Incaprettato','Invisibile','Paralizzato','Paura','Pietrificato','Privo di Sensi','Prono','Rallentato','Spaventato','Stupefatto','Trattenuto'];
   function buildResCard(){
     const card=CARD([]);
     card.appendChild(LBL('🛡 Resistenze & Immunità'));
@@ -2967,6 +2968,31 @@ function pgCombat(){
       section.appendChild(chips);
       card.appendChild(section);
     });
+    // Sezione immunità condizioni
+    const condImmSec=mk('div',{style:{marginTop:'8px'}});
+    condImmSec.appendChild(mk('div',{style:{color:'var(--gold)',fontSize:'10px',fontFamily:'var(--ft)',letterSpacing:'1px',marginBottom:'4px'}},['IMMUNITÀ CONDIZIONI']));
+    const condChips=mk('div',{style:{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'4px'}});
+    if(!C.condImmunities)C.condImmunities=[];
+    (C.condImmunities||[]).forEach((cond,ci2)=>{
+      const chip=mk('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'8px',border:'1px solid var(--gold)',color:'var(--gold)',background:'rgba(201,168,76,0.1)',display:'inline-flex',alignItems:'center',gap:'4px',cursor:'pointer'}});
+      chip.appendChild(mk('span',null,[cond]));
+      const x=mk('span',{style:{fontSize:'9px',opacity:'0.7'}},['✕']);
+      x.addEventListener('click',()=>{C.condImmunities.splice(ci2,1);save();render();});
+      chip.appendChild(x);
+      condChips.appendChild(chip);
+    });
+    const condSel=mk('select',{style:{fontSize:'11px',background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'4px',padding:'2px 4px'}});
+    condSel.appendChild(mk('option',{value:''},['+']));
+    CONDITION_TYPES.filter(c=>!(C.condImmunities||[]).includes(c)).forEach(c=>{condSel.appendChild(mk('option',{value:c},[c]));});
+    condSel.addEventListener('change',ev=>{
+      if(!ev.target.value)return;
+      if(!C.condImmunities)C.condImmunities=[];
+      C.condImmunities.push(ev.target.value);save();render();
+      ev.target.value='';
+    });
+    condChips.appendChild(condSel);
+    condImmSec.appendChild(condChips);
+    card.appendChild(condImmSec);
     return card;
   }
   p.appendChild(buildResCard());
@@ -3929,14 +3955,15 @@ function makeBlankCompanion(){
     maxHp:0,hp:0,thp:0,hdType:'1d8',hdMax:1,hdUsed:0,
     spAttack:0,spDC:0,
     senses:'',languages:'',
-    resistances:[],immunities:[],vulnerabilities:[],
+    resistances:[],immunities:[],vulnerabilities:[],condImmunities:[],
     skills:'',
     equipment:'',personality:'',appearance:'',
     racialFeatures:[],actions:[],bonusActions:[],reactions:[],
     weapons:[],
   };
 }
-const DAMAGE_TYPES_C=['Acido','Freddo','Fuoco','Fulmine','Forza','Necrotici','Radianti','Psichici','Sonoro','Tuono','Veleno','Perforanti','Taglienti','Contundenti','Non magici P/T/C'];
+const DAMAGE_TYPES_C=['Acido','Freddo','Fuoco','Fulmine','Forza','Necrotici','Radianti','Psichici','Sonoro','Tuono','Veleno','Perforanti','Taglienti','Contundenti','Non magici P/T/C','Veleno Psichico'];
+const CONDITION_TYPES_C=['Accecato','Affascinato','Afferrato','Ammaliato','Assordato','Avvelenato','Esaurito','Incapacitato','Incaprettato','Invisibile','Paralizzato','Paura','Pietrificato','Privo di Sensi','Prono','Rallentato','Spaventato','Stupefatto','Trattenuto'];
 
 const WILD_BESTIARY=[{"name":"Lupo","cr14":"1/4","cr24":"1/4","type":"Bestia","size":"Media","ac14":13,"ac24":13,"hp14":11,"hd14":"2d8+2","str":12,"dex":15,"con":12,"int":3,"wis":12,"cha":6,"spd":12,"swim":0,"fly":0,"burrow":0,"climb":0,"skills":"Percezione +3, Furtività +4","senses":"Percezione Passiva 13","traits14":"Tattica del Branco: vantaggio ai tiri per colpire se almeno un alleato è entro 1.5m dal bersaglio e non è incapacitato.\nOlfatto e Udito Affinati: vantaggio alle prove di Saggezza (Percezione) basate sull'olfatto o sull'udito.","traits24":"Olfatto e Udito Affinati: vantaggio alle prove di Saggezza (Percezione) basate su olfatto o udito.\nPack Tactics: vantaggio ai tiri per colpire se un alleato cosciente è entro 1.5m dal bersaglio.","actions":[{"n":"Morso","atk":4,"dmg":"2d4+2","type":"Perforanti","desc":"Portata 1.5m. Se il bersaglio è una creatura, TS Forza CD 11 o cade prono."}]},{"name":"Ragno della Terra Gigante","cr14":"1/4","cr24":"1/4","type":"Bestia","size":"Media","ac14":12,"ac24":12,"hp14":11,"hd14":"2d8+2","str":10,"dex":14,"con":12,"int":2,"wis":11,"cha":4,"spd":9,"swim":0,"fly":0,"burrow":0,"climb":9,"skills":"Furtività +4","senses":"Vista cieca 3m, Percezione Passiva 10","traits14":"Scalare Ragni: può scalare superfici difficili, inclusi i soffitti, senza prove di caratteristica.\nSentire Ragnatela: a contatto con una ragnatela, conosce l'esatta posizione di altre creature a contatto con la stessa ragnatela.","traits24":"Scalare Ragni: può scalare superfici difficili, inclusi i soffitti, senza prove di caratteristica.\nSentire Ragnatela: a contatto con una ragnatela, conosce l'esatta posizione di altre creature a contatto con la stessa ragnatela.","actions":[{"n":"Morso","atk":4,"dmg":"1d4+2","type":"Perforanti","desc":"Più 2d6 danni da veleno (TS Costituzione CD 11 per dimezzare)."}]},{"name":"Coccodrillo","cr14":"1/2","cr24":"1/2","type":"Bestia","size":"Grande","ac14":12,"ac24":12,"hp14":19,"hd14":"3d10+3","str":15,"dex":10,"con":13,"int":2,"wis":10,"cha":5,"spd":6,"swim":9,"fly":0,"burrow":0,"climb":0,"skills":"Furtività +2","senses":"Percezione Passiva 10","traits14":"Trattenere il Respiro: può trattenere il respiro per 15 minuti.","traits24":"Hold Breath: trattiene il respiro per 15 minuti.","actions":[{"n":"Morso","atk":4,"dmg":"1d10+2","type":"Perforanti","desc":"Il bersaglio è Afferrato (CD 12 per sfuggire). Finché afferrato è Trattenuto; il coccodrillo non può mordere altri."}]},{"name":"Orso Bruno","cr14":"1","cr24":"1","type":"Bestia","size":"Grande","ac14":11,"ac24":11,"hp14":34,"hd14":"4d10+12","str":19,"dex":10,"con":16,"int":2,"wis":13,"cha":7,"spd":12,"swim":0,"fly":0,"burrow":0,"climb":9,"skills":"Percezione +3","senses":"Olfatto affinato (vantaggio), Percezione Passiva 13","traits14":"","traits24":"","actions":[{"n":"Morso","atk":5,"dmg":"1d8+4","type":"Perforanti","desc":"Portata 1.5m."},{"n":"Artigli","atk":5,"dmg":"2d6+4","type":"Taglienti","desc":"Portata 1.5m. (Attacco Multiplo: morso + artigli)"}]},{"name":"Aquila Gigante","cr14":"1","cr24":"1","type":"Bestia","size":"Grande","ac14":13,"ac24":13,"hp14":26,"hd14":"4d10+4","str":16,"dex":17,"con":13,"int":8,"wis":14,"cha":10,"spd":3,"swim":0,"fly":24,"burrow":0,"climb":0,"skills":"Percezione +4","senses":"Vista affinata (vantaggio), Percezione Passiva 14","traits14":"Vista Affinata: vantaggio alle prove di Saggezza (Percezione) basate sulla vista.","traits24":"Vista Affinata: vantaggio a Percezione visiva.","actions":[{"n":"Becco","atk":5,"dmg":"1d8+3","type":"Perforanti","desc":"Portata 1.5m. (Attacco Multiplo: becco + artigli)"},{"n":"Artigli","atk":5,"dmg":"2d6+3","type":"Taglienti","desc":"Portata 1.5m."}]},{"name":"Tigre con Denti a Sciabola","cr14":"2","cr24":"2","type":"Bestia","size":"Grande","ac14":12,"ac24":12,"hp14":52,"hd14":"7d10+14","str":18,"dex":14,"con":15,"int":3,"wis":12,"cha":8,"spd":12,"swim":0,"fly":0,"burrow":0,"climb":0,"skills":"Furtività +6, Percezione +3","senses":"Percezione Passiva 13","traits14":"Assalto: se si muove di almeno 6m verso un bersaglio e lo colpisce con gli artigli nello stesso turno, il bersaglio TS Forza CD 14 o cade prono. Se prono, attacco di morso come azione bonus.","traits24":"Pounce: se si muove di 6m verso il bersaglio e lo colpisce con gli artigli, TS Forza CD 14 o cade Prono. Se prono, Morso come Azione Bonus.","actions":[{"n":"Morso","atk":6,"dmg":"1d10+4","type":"Perforanti","desc":"Portata 1.5m."},{"n":"Artigli","atk":6,"dmg":"2d6+5","type":"Taglienti","desc":"Portata 1.5m."}]},{"name":"Anchilosauro","cr14":"3","cr24":"3","type":"Bestia","size":"Mastodontica","ac14":15,"ac24":15,"hp14":68,"hd14":"8d12+16","str":19,"dex":11,"con":15,"int":2,"wis":12,"cha":5,"spd":9,"swim":0,"fly":0,"burrow":0,"climb":0,"skills":"","senses":"Percezione Passiva 11","traits14":"","traits24":"","actions":[{"n":"Coda","atk":7,"dmg":"4d6+4","type":"Contundenti","desc":"Portata 3m. Il bersaglio TS Forza CD 14 o cade prono."}]},{"name":"Elefante","cr14":"4","cr24":"4","type":"Bestia","size":"Mastodontica","ac14":12,"ac24":12,"hp14":76,"hd14":"8d12+24","str":22,"dex":10,"con":17,"int":3,"wis":11,"cha":6,"spd":12,"swim":0,"fly":0,"burrow":0,"climb":0,"skills":"","senses":"Percezione Passiva 10","traits14":"Carica Travolgente: se si muove di almeno 6m verso una creatura e la colpisce con le zanne nello stesso turno, il bersaglio TS Forza CD 12 o cade prono. Se prono, calpestamento come azione bonus.","traits24":"Trampling Charge: movimento di 6m in linea retta + attacco Zanne: il bersaglio TS Forza CD 16 o cade Prono. Se prono, Azione Bonus Calpestamento.","actions":[{"n":"Zanne (Gore)","atk":8,"dmg":"3d8+6","type":"Perforanti","desc":"Portata 1.5m."},{"n":"Calpestamento","atk":8,"dmg":"3d10+6","type":"Contundenti","desc":"Portata 1.5m."}]},{"name":"Coccodrillo Gigante","cr14":"5","cr24":"5","type":"Bestia","size":"Mastodontica","ac14":14,"ac24":14,"hp14":105,"hd14":"9d12+45","str":25,"dex":10,"con":20,"int":2,"wis":10,"cha":7,"spd":9,"swim":15,"fly":0,"burrow":0,"climb":0,"skills":"","senses":"Percezione Passiva 10","traits14":"","traits24":"","actions":[{"n":"Morso","atk":8,"dmg":"3d10+5","type":"Perforanti","desc":"Portata 1.5m. Il bersaglio è Afferrato (CD 16); finché afferrato è Trattenuto."},{"n":"Coda","atk":8,"dmg":"2d8+5","type":"Contundenti","desc":"Portata 3m. Il bersaglio TS Forza CD 16 o cade prono."}]},{"name":"Mammut","cr14":"6","cr24":"6","type":"Bestia","size":"Mastodontica","ac14":13,"ac24":13,"hp14":126,"hd14":"11d12+55","str":24,"dex":11,"con":21,"int":3,"wis":11,"cha":6,"spd":12,"swim":0,"fly":0,"burrow":0,"climb":0,"skills":"","senses":"Percezione Passiva 10","traits14":"Trampling Charge: se si muove di 6m verso un bersaglio e lo colpisce con le zanne, TS Forza CD 18 o prono. Se prono, calpestamento come azione bonus.","traits24":"Trampling Charge: movimento rettilineo 6m + attacco Zanne: TS Forza CD 18 o cade Prono. Se prono, sblocca Azione Bonus Calpestamento.","actions":[{"n":"Zanne (Gore)","atk":10,"dmg":"4d8+7","type":"Perforanti","desc":"Portata 3m."},{"n":"Calpestamento","atk":10,"dmg":"4d10+7","type":"Contundenti","desc":"Portata 1.5m."}]}];
 
@@ -4259,6 +4286,31 @@ function pgCompanionGeneric(listKey, pageTitle, pageIcon, showBestiary){
       sec.appendChild(chips);
       resSection.appendChild(sec);
     });
+    // Immunità condizioni
+    const condImmSec=mk('div',{style:{marginTop:'6px'}});
+    condImmSec.appendChild(mk('div',{style:{color:'var(--gold)',fontSize:'9px',fontFamily:'var(--ft)',letterSpacing:'1px',marginBottom:'3px'}},['IMMUNITÀ CONDIZIONI']));
+    const condChips=mk('div',{style:{display:'flex',flexWrap:'wrap',gap:'3px'}});
+    if(!comp.condImmunities)comp.condImmunities=[];
+    (comp.condImmunities||[]).forEach((cond,ci2)=>{
+      const chip=mk('span',{style:{fontSize:'10px',padding:'1px 6px',borderRadius:'7px',border:'1px solid var(--gold)',color:'var(--gold)',background:'rgba(201,168,76,0.1)',display:'inline-flex',alignItems:'center',gap:'3px',cursor:'pointer'}});
+      chip.appendChild(mk('span',null,[cond]));
+      const x=mk('span',{style:{fontSize:'8px',opacity:'0.7'}},['✕']);
+      x.addEventListener('click',()=>{C[listKey][ci].condImmunities.splice(ci2,1);save();render();});
+      chip.appendChild(x);
+      condChips.appendChild(chip);
+    });
+    const condSel=mk('select',{style:{fontSize:'10px',background:'var(--card)',border:'1px solid var(--border)',color:'var(--td)',borderRadius:'4px',padding:'1px 3px'}});
+    condSel.appendChild(mk('option',{value:''},['+']));
+    CONDITION_TYPES_C.filter(c=>!(comp.condImmunities||[]).includes(c)).forEach(c=>{condSel.appendChild(mk('option',{value:c},[c]));});
+    condSel.addEventListener('change',ev=>{
+      if(!ev.target.value)return;
+      if(!C[listKey][ci].condImmunities)C[listKey][ci].condImmunities=[];
+      C[listKey][ci].condImmunities.push(ev.target.value);save();render();
+      ev.target.value='';
+    });
+    condChips.appendChild(condSel);
+    condImmSec.appendChild(condChips);
+    resSection.appendChild(condImmSec);
     body.appendChild(resSection);
 
     // Sensi e Linguaggi
