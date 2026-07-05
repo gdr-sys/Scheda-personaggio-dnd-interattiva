@@ -515,6 +515,7 @@ const DEF={
   sp:{str:false,dex:false,con:false,int:false,wis:false,cha:false},
   spBonus:{str:0,dex:0,con:0,int:0,wis:0,cha:0},
   skBonus:{},
+  passBonus:{perc:0,intu:0,indag:0},
   sk:{
     acrobazia:{s:"dex",p:false,e:false},"addestrare animali":{s:"wis",p:false,e:false},
     arcano:{s:"int",p:false,e:false},atletica:{s:"str",p:false,e:false},
@@ -571,6 +572,7 @@ function load(){try{const s=localStorage.getItem('dnd5');if(s){const d=JSON.pars
   // Migrazione vecchi campi
   if(!C.spBonus)C.spBonus={str:0,dex:0,con:0,int:0,wis:0,cha:0};
   if(!C.skBonus)C.skBonus={};
+  if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
   if(C.hd&&!C.hdType){C.hdType=C.hd;}
   if(C.hdType===undefined)C.hdType='1d8';
   if(C.exhaustion===undefined)C.exhaustion=0;
@@ -1876,9 +1878,42 @@ function pgMain(){
 
   // Abilità Passive
   const passiveGrid=GRID([
-    CARD([LBL('Perc. Passiva'),DIV([String(10+skB('percezione'))],{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',textAlign:'center'}})],{textAlign:'center',padding:'6px'}),
-    CARD([LBL('Intuiz. Passiva'),DIV([String(10+skB('intuizione'))],{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',textAlign:'center'}})],{textAlign:'center',padding:'6px'}),
-    CARD([LBL('Indag. Passivo'),DIV([String(10+skB('indagare'))],{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',textAlign:'center'}})],{textAlign:'center',padding:'6px'}),
+    CARD([(()=>{
+      if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
+      const bonus=C.passBonus['perc']||0;
+      const total=10+skB('percezione')+bonus;
+      const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
+      wrap.appendChild(LBL('Perc. Passiva'));
+      wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
+      const bonInp=mk('input',{type:'number',value:String(bonus),style:{width:'48px',textAlign:'center',fontSize:'11px',padding:'2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'},placeholder:'+0',title:'Bonus extra (es. Observant +5)'});
+      bonInp.addEventListener('change',ev=>{if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};C.passBonus['perc']=Number(ev.target.value)||0;save();render();});
+      wrap.appendChild(bonInp);
+      return wrap;
+    })()],{textAlign:'center',padding:'6px'}),
+    CARD([(()=>{
+      if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
+      const bonus=C.passBonus['intu']||0;
+      const total=10+skB('intuizione')+bonus;
+      const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
+      wrap.appendChild(LBL('Intuiz. Passiva'));
+      wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
+      const bonInp=mk('input',{type:'number',value:String(bonus),style:{width:'48px',textAlign:'center',fontSize:'11px',padding:'2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'},placeholder:'+0',title:'Bonus extra (es. Observant +5)'});
+      bonInp.addEventListener('change',ev=>{if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};C.passBonus['intu']=Number(ev.target.value)||0;save();render();});
+      wrap.appendChild(bonInp);
+      return wrap;
+    })()],{textAlign:'center',padding:'6px'}),
+    CARD([(()=>{
+      if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
+      const bonus=C.passBonus['indag']||0;
+      const total=10+skB('indagare')+bonus;
+      const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
+      wrap.appendChild(LBL('Indag. Passivo'));
+      wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
+      const bonInp=mk('input',{type:'number',value:String(bonus),style:{width:'48px',textAlign:'center',fontSize:'11px',padding:'2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'},placeholder:'+0',title:'Bonus extra (es. Observant +5)'});
+      bonInp.addEventListener('change',ev=>{if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};C.passBonus['indag']=Number(ev.target.value)||0;save();render();});
+      wrap.appendChild(bonInp);
+      return wrap;
+    })()],{textAlign:'center',padding:'6px'}),
   ],'1fr 1fr 1fr',6,{marginTop:'8px'});
   p.appendChild(passiveGrid);
 
@@ -2323,7 +2358,7 @@ function pgSkills(){
       return ROW([
         CHK(!!(C.sp||{})[s],v=>{C.sp[s]=v;save();render();}),
         mk('span',{style:{color:'var(--td)',fontFamily:'var(--fb)',fontSize:'12px',flex:'1'}},[SL[s]]),
-        NI((C.spBonus||{})[s]||0,v=>{if(!C.spBonus)C.spBonus={};C.spBonus[s]=v;save();render();},undefined,undefined,{width:'42px',fontSize:'11px',textAlign:'center',padding:'3px 2px',color:'var(--bluel)'}),
+        (()=>{const inp=mk('input',{type:'number',value:String((C.spBonus||{})[s]||0),style:{width:'42px',textAlign:'center',fontSize:'11px',padding:'3px 2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{if(!C.spBonus)C.spBonus={};C.spBonus[s]=Number(ev.target.value)||0;save();render();});return inp;})(),
         (()=>{const btn=BTN(fm(total),()=>showRoll('1d20'+fm(total),'TS '+SL[s]),'gold sm',{style:{minWidth:'42px',padding:'3px 6px',fontFamily:'var(--ft)',fontSize:'13px'}});return btn;})()
       ]);
     }),'1fr 1fr',4,{marginTop:'6px'})
@@ -2340,7 +2375,7 @@ function pgSkills(){
     nm.textContent=name+' ('+SL[s.s]+')';
     row.appendChild(nm);
     // Modificatore manuale abilità
-    const bonI=NI((C.skBonus||{})[name]||0,v=>{if(!C.skBonus)C.skBonus={};C.skBonus[name]=v;save();render();},undefined,undefined,{width:'42px',fontSize:'11px',textAlign:'center',padding:'3px 2px',color:'var(--bluel)'});
+    const bonI=(()=>{const inp=mk('input',{type:'number',value:String((C.skBonus||{})[name]||0),style:{width:'42px',textAlign:'center',fontSize:'11px',padding:'3px 2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{if(!C.skBonus)C.skBonus={};C.skBonus[name]=Number(ev.target.value)||0;save();render();});return inp;})();
     row.appendChild(bonI);
     const total=skB(name);
     const rollBtn=BTN(fm(total),()=>showRoll('1d20'+fm(total),name.charAt(0).toUpperCase()+name.slice(1)),'gold sm',{style:{minWidth:'42px',padding:'3px 6px',fontFamily:'var(--ft)',fontSize:'13px'}});
@@ -2589,13 +2624,46 @@ function pgCombat(){
   const infoRow=GRID([
     (()=>{const initEl=mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',lineHeight:'1.2'}},[fm(S.dex)]);initEl.addEventListener('click',()=>showRoll('1d20'+fm(S.dex),'Iniziativa'));return mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Iniziativa'),initEl]);})(),
     mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Velocità (m)'),mk('div',{style:{fontSize:'20px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(C.spd||30)])]),
-    mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Perc. Passiva'),mk('div',{style:{fontSize:'20px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(10+skB('percezione'))])]),
+    (()=>{
+      if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
+      const bonus=C.passBonus['perc']||0;
+      const total=10+skB('percezione')+bonus;
+      const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
+      wrap.appendChild(LBL('Perc. Passiva'));
+      wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
+      const bonInp=mk('input',{type:'number',value:String(bonus),style:{width:'48px',textAlign:'center',fontSize:'11px',padding:'2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'},placeholder:'+0',title:'Bonus extra (es. Observant +5)'});
+      bonInp.addEventListener('change',ev=>{if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};C.passBonus['perc']=Number(ev.target.value)||0;save();render();});
+      wrap.appendChild(bonInp);
+      return wrap;
+    })(),
   ],'1fr 1fr 1fr',6);
   p.appendChild(CARD([infoRow]));
 
   const passiveRow2=GRID([
-    mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Intuiz. Passiva'),mk('div',{style:{fontSize:'18px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(10+skB('intuizione'))])]),
-    mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Indag. Passivo'),mk('div',{style:{fontSize:'18px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(10+skB('indagare'))])]),
+    (()=>{
+      if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
+      const bonus=C.passBonus['intu']||0;
+      const total=10+skB('intuizione')+bonus;
+      const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
+      wrap.appendChild(LBL('Intuiz. Passiva'));
+      wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
+      const bonInp=mk('input',{type:'number',value:String(bonus),style:{width:'48px',textAlign:'center',fontSize:'11px',padding:'2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'},placeholder:'+0',title:'Bonus extra (es. Observant +5)'});
+      bonInp.addEventListener('change',ev=>{if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};C.passBonus['intu']=Number(ev.target.value)||0;save();render();});
+      wrap.appendChild(bonInp);
+      return wrap;
+    })(),
+    (()=>{
+      if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
+      const bonus=C.passBonus['indag']||0;
+      const total=10+skB('indagare')+bonus;
+      const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
+      wrap.appendChild(LBL('Indag. Passivo'));
+      wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
+      const bonInp=mk('input',{type:'number',value:String(bonus),style:{width:'48px',textAlign:'center',fontSize:'11px',padding:'2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'},placeholder:'+0',title:'Bonus extra (es. Observant +5)'});
+      bonInp.addEventListener('change',ev=>{if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};C.passBonus['indag']=Number(ev.target.value)||0;save();render();});
+      wrap.appendChild(bonInp);
+      return wrap;
+    })(),
   ],'1fr 1fr',6,{marginTop:'6px'});
   p.appendChild(CARD([passiveRow2]));
 
