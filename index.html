@@ -2358,7 +2358,7 @@ function pgSkills(){
       return ROW([
         CHK(!!(C.sp||{})[s],v=>{C.sp[s]=v;save();render();}),
         mk('span',{style:{color:'var(--td)',fontFamily:'var(--fb)',fontSize:'12px',flex:'1'}},[SL[s]]),
-        (()=>{const inp=mk('input',{type:'number',value:String((C.spBonus||{})[s]||0),style:{width:'42px',textAlign:'center',fontSize:'11px',padding:'3px 2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{if(!C.spBonus)C.spBonus={};C.spBonus[s]=Number(ev.target.value)||0;save();render();});return inp;})(),
+        (()=>{const bv=(C.spBonus||{})[s]||0;const inp=mk('input',{type:'number',value:String(bv),title:'Bonus extra',style:{width:'32px',textAlign:'center',fontSize:'10px',padding:'2px 1px',border:'1px solid '+(bv!==0?'var(--bluel)':'var(--border)'),borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box',opacity:bv!==0?'1':'0.5'}});inp.addEventListener('change',ev=>{if(!C.spBonus)C.spBonus={};C.spBonus[s]=Number(ev.target.value)||0;save();render();});return inp;})(),
         (()=>{const btn=BTN(fm(total),()=>showRoll('1d20'+fm(total),'TS '+SL[s]),'gold sm',{style:{minWidth:'42px',padding:'3px 6px',fontFamily:'var(--ft)',fontSize:'13px'}});return btn;})()
       ]);
     }),'1fr 1fr',4,{marginTop:'6px'})
@@ -2374,15 +2374,16 @@ function pgSkills(){
     const nm=mk('span',{style:{color:s.e?'var(--gl)':s.p?'var(--text)':'var(--td)',fontFamily:'var(--fb)',fontSize:'13px',flex:'1',textTransform:'capitalize'}});
     nm.textContent=name+' ('+SL[s.s]+')';
     row.appendChild(nm);
-    // Modificatore manuale abilità
-    const bonI=(()=>{const inp=mk('input',{type:'number',value:String((C.skBonus||{})[name]||0),style:{width:'42px',textAlign:'center',fontSize:'11px',padding:'3px 2px',border:'1px solid var(--bluel)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{if(!C.skBonus)C.skBonus={};C.skBonus[name]=Number(ev.target.value)||0;save();render();});return inp;})();
-    row.appendChild(bonI);
     const total=skB(name);
-    const rollBtn=BTN(fm(total),()=>showRoll('1d20'+fm(total),name.charAt(0).toUpperCase()+name.slice(1)),'gold sm',{style:{minWidth:'42px',padding:'3px 6px',fontFamily:'var(--ft)',fontSize:'13px'}});
+    const bonVal=(C.skBonus||{})[name]||0;
+    // Campo bonus: piccolo, visibile solo con bordo se non zero
+    const bonI=(()=>{const inp=mk('input',{type:'number',value:String(bonVal),title:'Bonus extra',style:{width:'32px',textAlign:'center',fontSize:'10px',padding:'2px 1px',border:'1px solid '+(bonVal!==0?'var(--bluel)':'var(--border)'),borderRadius:'var(--r)',background:'var(--card)',color:'var(--bluel)',boxSizing:'border-box',opacity:bonVal!==0?'1':'0.5'}});inp.addEventListener('change',ev=>{if(!C.skBonus)C.skBonus={};C.skBonus[name]=Number(ev.target.value)||0;save();render();});return inp;})();
+    row.appendChild(bonI);
+    const rollBtn=BTN(fm(total),()=>showRoll('1d20'+fm(total),name.charAt(0).toUpperCase()+name.slice(1)),'gold sm',{style:{minWidth:'44px',padding:'3px 6px',fontFamily:'var(--ft)',fontSize:'14px'}});
     row.appendChild(rollBtn);
     skList.appendChild(row);
   });
-  p.appendChild(CARD([LBL('Abilità (1°✦=competenza, 2°✦=maestria  |  campo blu=modificatore  |  clicca il totale per tirare)'),skList]));
+  p.appendChild(CARD([LBL('Abilità  ·  ✦=competenza  ✦✦=maestria  ·  campo blu=bonus extra  ·  tasto=tira'),skList]));
 
   // Competenze
   p.appendChild(CARD([LBL('Lingue & Competenze'),
@@ -4218,22 +4219,22 @@ function pgCompanionGeneric(listKey, pageTitle, pageIcon, showBestiary){
 
     // CA / Iniziativa / Velocità
     body.appendChild(GRID([
-      CARD([LBL('CA'),(()=>{const e=mk('div',{style:{fontSize:'20px',color:'var(--gl)',fontFamily:'var(--ft)',textAlign:'center'}},[String(acT)]);return e;})(),NI(comp.bac||10,v=>{C[listKey][ci].bac=v;save();render();},undefined,undefined,{width:'100%',marginTop:'4px'})],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('CA'),(()=>{const e=mk('div',{style:{fontSize:'20px',color:'var(--gl)',fontFamily:'var(--ft)',textAlign:'center'}},[String(acT)]);return e;})(),(()=>{const inp=mk('input',{type:'number',value:String(comp.bac||10),style:{width:'100%',textAlign:'center',fontSize:'16px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box',marginTop:'4px'}});inp.addEventListener('change',ev=>{C[listKey][ci].bac=Number(ev.target.value)||10;save();render();});return inp;})()],{textAlign:'center',padding:'6px'}),
       CARD([LBL('Iniziativa'),(()=>{const e=mk('div',{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',textAlign:'center'}},[fm(S.dex)]);e.addEventListener('click',()=>showRoll('1d20'+fm(S.dex),'Iniziativa'));return e;})()],{textAlign:'center',padding:'6px'}),
-      CARD([LBL('Vel. (m)'),NI(comp.spd||30,v=>{C[listKey][ci].spd=v;save();},undefined,undefined,{width:'100%'})],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('Vel. (m)'),(()=>{const inp=mk('input',{type:'number',value:String(comp.spd||30),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].spd=Number(ev.target.value)||0;save();});return inp;})()],{textAlign:'center',padding:'6px'}),
     ],'1fr 1fr 1fr',4,{marginBottom:'6px'}));
     body.appendChild(GRID([
-      DIV([LBL('Volare (m)'),NI(comp.fly||0,v=>{C[listKey][ci].fly=v;save();},undefined,undefined,{width:'100%'})]),
-      DIV([LBL('Nuotare (m)'),NI(comp.swim||0,v=>{C[listKey][ci].swim=v;save();},undefined,undefined,{width:'100%'})]),
-      DIV([LBL('Scavare (m)'),NI(comp.burrow||0,v=>{C[listKey][ci].burrow=v;save();},undefined,undefined,{width:'100%'})]),
-      DIV([LBL('Arrampicare (m)'),NI(comp.climb||0,v=>{C[listKey][ci].climb=v;save();},undefined,undefined,{width:'100%'})]),
+      DIV([LBL('Volare (m)'),(()=>{const inp=mk('input',{type:'number',value:String(comp.fly||0),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].fly=Number(ev.target.value)||0;save();});return inp;})()]),
+      DIV([LBL('Nuotare (m)'),(()=>{const inp=mk('input',{type:'number',value:String(comp.swim||0),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].swim=Number(ev.target.value)||0;save();});return inp;})()]),
+      DIV([LBL('Scavare (m)'),(()=>{const inp=mk('input',{type:'number',value:String(comp.burrow||0),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].burrow=Number(ev.target.value)||0;save();});return inp;})()]),
+      DIV([LBL('Arrampicare (m)'),(()=>{const inp=mk('input',{type:'number',value:String(comp.climb||0),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].climb=Number(ev.target.value)||0;save();});return inp;})()]),
     ],'1fr 1fr 1fr 1fr',4,{marginBottom:'10px'}));
 
     // PF
     body.appendChild(GRID([
-      CARD([LBL('PF Max'),NI(comp.maxHp||0,v=>{C[listKey][ci].maxHp=Math.max(0,v);if(C[listKey][ci].hp>C[listKey][ci].maxHp)C[listKey][ci].hp=C[listKey][ci].maxHp;save();render();},undefined,undefined,{width:'100%',fontSize:'16px',textAlign:'center'})],{textAlign:'center',padding:'6px'}),
-      CARD([LBL('PF Attuali'),NI(comp.hp||0,v=>{C[listKey][ci].hp=Math.max(-999,Math.min(comp.maxHp||0,v));save();render();},undefined,undefined,{width:'100%',fontSize:'16px',textAlign:'center',color:(comp.hp||0)<=0?'var(--rl)':(comp.hp||0)<(comp.maxHp||0)*.5?'#e8a030':'var(--greenl)'})],{textAlign:'center',padding:'6px'}),
-      CARD([LBL('PF Temp.'),NI(comp.thp||0,v=>{C[listKey][ci].thp=Math.max(0,v);save();},undefined,undefined,{width:'100%',fontSize:'16px',textAlign:'center',color:'var(--bluel)'})],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('PF Max'),(()=>{const inp=mk('input',{type:'number',value:String(comp.maxHp||0),style:{width:'100%',textAlign:'center',fontSize:'16px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].maxHp=Math.max(0,Number(ev.target.value)||0);if(C[listKey][ci].hp>C[listKey][ci].maxHp)C[listKey][ci].hp=C[listKey][ci].maxHp;save();render();});return inp;})()],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('PF Attuali'),(()=>{const hpCol=(comp.hp||0)<=0?'var(--rl)':(comp.hp||0)<(comp.maxHp||0)*.5?'#e8a030':'var(--greenl)';const inp=mk('input',{type:'number',value:String(comp.hp||0),style:{width:'100%',textAlign:'center',fontSize:'16px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:hpCol,boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].hp=Math.max(-999,Math.min(comp.maxHp||0,Number(ev.target.value)||0));save();render();});return inp;})()],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('PF Temp.'),(()=>{const inp=mk('input',{type:'number',value:String(comp.thp||0),style:{width:'100%',textAlign:'center',fontSize:'16px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--bluel)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].thp=Math.max(0,Number(ev.target.value)||0);save();});return inp;})()],{textAlign:'center',padding:'6px'}),
     ],'1fr 1fr 1fr',4,{marginBottom:'6px'}));
 
     // Dadi vita
@@ -4243,7 +4244,7 @@ function pgCompanionGeneric(listKey, pageTitle, pageIcon, showBestiary){
         LBL('Dadi Vita',{marginBottom:'0'}),
         mk('span',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'13px'}},[String(hdAvail)+'/'+String(comp.hdMax||1)]),
         SEL(comp.hdType||'1d8',[['1d6','1d6'],['1d8','1d8'],['1d10','1d10'],['1d12','1d12']],v=>{C[listKey][ci].hdType=v;save();},{fontSize:'11px',width:'60px'}),
-        NI(comp.hdMax||1,v=>{C[listKey][ci].hdMax=Math.max(1,v);save();render();},undefined,undefined,{width:'42px'}),
+        (()=>{const inp=mk('input',{type:'number',value:String(comp.hdMax||1),style:{width:'42px',textAlign:'center',fontSize:'13px',padding:'3px 2px',border:'1px solid var(--border)',borderRadius:'var(--r)',background:'var(--card)',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].hdMax=Math.max(1,Number(ev.target.value)||1);save();render();});return inp;})(),
       ],{gap:'6px',alignItems:'center'}),
       BTN('Usa Dado',()=>{
         if((comp.hdUsed||0)>=(comp.hdMax||1))return;
@@ -4255,8 +4256,8 @@ function pgCompanionGeneric(listKey, pageTitle, pageIcon, showBestiary){
 
     // Attacco Incantesimi / CD / Percezione Passiva
     body.appendChild(GRID([
-      DIV([LBL('Attacco Incant.'),NI(comp.spAttack||0,v=>{C[listKey][ci].spAttack=v;save();},undefined,undefined,{width:'100%',textAlign:'center'})]),
-      DIV([LBL('CD Incant.'),NI(comp.spDC||0,v=>{C[listKey][ci].spDC=v;save();},undefined,undefined,{width:'100%',textAlign:'center'})]),
+      DIV([LBL('Attacco Incant.'),(()=>{const inp=mk('input',{type:'number',value:String(comp.spAttack||0),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].spAttack=Number(ev.target.value)||0;save();});return inp;})()]),
+      DIV([LBL('CD Incant.'),(()=>{const inp=mk('input',{type:'number',value:String(comp.spDC||0),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].spDC=Number(ev.target.value)||0;save();});return inp;})()]),
       DIV([LBL('Perc. Passiva'),mk('div',{style:{textAlign:'center',color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'15px',paddingTop:'3px'}},[String(10+S.wis)])]),
     ],'1fr 1fr 1fr',4,{marginTop:'8px',marginBottom:'8px'}));
 
