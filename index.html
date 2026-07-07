@@ -1870,10 +1870,10 @@ function pgMain(){
 
   // Init / Passive / Darkvision
   const initGrid=GRID([
-    CARD([LBL('Iniziativa'),DIV([fm(S.dex)],{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',textAlign:'center'}})],{textAlign:'center',padding:'8px'}),
+    CARD([LBL('Iniziativa'),DIV([fm(S.dex+(C.featInitBonus||0))],{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',textAlign:'center'}})],{textAlign:'center',padding:'8px'}),
     CARD([LBL('Scurovisione'),(()=>{const i=mk('input',{type:'text',value:String(C.dkv||0),style:{width:'100%',textAlign:'center'}});i.addEventListener('change',ev=>{C.dkv=Number(ev.target.value)||0;save();});return i;})()],{textAlign:'center',padding:'8px'}),
   ],'1fr 1fr',6);
-  initGrid.children[0].querySelector('div div').addEventListener('click',()=>showRoll('1d20'+fm(S.dex),'Iniziativa'));
+  initGrid.children[0].querySelector('div div').addEventListener('click',()=>showRoll('1d20'+fm(S.dex+(C.featInitBonus||0)),'Iniziativa'));
   p.appendChild(initGrid);
 
   // Abilità Passive
@@ -1881,7 +1881,8 @@ function pgMain(){
     CARD([(()=>{
       if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
       const bonus=C.passBonus['perc']||0;
-      const total=10+skB('percezione')+bonus;
+      const featB=(C.featPassBonus||{}).perc||0;
+      const total=10+skB('percezione')+bonus+featB;
       const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
       wrap.appendChild(LBL('Perc. Passiva'));
       wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
@@ -1893,7 +1894,8 @@ function pgMain(){
     CARD([(()=>{
       if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
       const bonus=C.passBonus['intu']||0;
-      const total=10+skB('intuizione')+bonus;
+      const featB=(C.featPassBonus||{}).intu||0;
+      const total=10+skB('intuizione')+bonus+featB;
       const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
       wrap.appendChild(LBL('Intuiz. Passiva'));
       wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
@@ -1905,7 +1907,8 @@ function pgMain(){
     CARD([(()=>{
       if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
       const bonus=C.passBonus['indag']||0;
-      const total=10+skB('indagare')+bonus;
+      const featB=(C.featPassBonus||{}).indag||0;
+      const total=10+skB('indagare')+bonus+featB;
       const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
       wrap.appendChild(LBL('Indag. Passivo'));
       wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
@@ -2623,12 +2626,13 @@ function pgCombat(){
   p.appendChild(CARD([ROW([caCol,acModsDiv],{alignItems:'flex-start'})]));
 
   const infoRow=GRID([
-    (()=>{const initEl=mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',lineHeight:'1.2'}},[fm(S.dex)]);initEl.addEventListener('click',()=>showRoll('1d20'+fm(S.dex),'Iniziativa'));return mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Iniziativa'),initEl]);})(),
-    mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Velocità (m)'),mk('div',{style:{fontSize:'20px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String(C.spd||30)])]),
+    (()=>{const initEl=mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',lineHeight:'1.2'}},[fm(S.dex+(C.featInitBonus||0))]);initEl.addEventListener('click',()=>showRoll('1d20'+fm(S.dex+(C.featInitBonus||0)),'Iniziativa'));return mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Iniziativa'),initEl]);})(),
+    mk('div',{style:{textAlign:'center',padding:'6px'}},[LBL('Velocità (m)'),mk('div',{style:{fontSize:'20px',color:'var(--td)',fontFamily:'var(--ft)',lineHeight:'1.2'}},[String((C.spd||C.speed||30)+(C.featSpeedBonus||0))])]),
     (()=>{
       if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
       const bonus=C.passBonus['perc']||0;
-      const total=10+skB('percezione')+bonus;
+      const featB=(C.featPassBonus||{}).perc||0;
+      const total=10+skB('percezione')+bonus+featB;
       const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
       wrap.appendChild(LBL('Perc. Passiva'));
       wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
@@ -2644,7 +2648,8 @@ function pgCombat(){
     (()=>{
       if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
       const bonus=C.passBonus['intu']||0;
-      const total=10+skB('intuizione')+bonus;
+      const featB=(C.featPassBonus||{}).intu||0;
+      const total=10+skB('intuizione')+bonus+featB;
       const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
       wrap.appendChild(LBL('Intuiz. Passiva'));
       wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
@@ -2656,7 +2661,8 @@ function pgCombat(){
     (()=>{
       if(!C.passBonus)C.passBonus={perc:0,intu:0,indag:0};
       const bonus=C.passBonus['indag']||0;
-      const total=10+skB('indagare')+bonus;
+      const featB=(C.featPassBonus||{}).indag||0;
+      const total=10+skB('indagare')+bonus+featB;
       const wrap=mk('div',{style:{textAlign:'center',padding:'6px'}});
       wrap.appendChild(LBL('Indag. Passivo'));
       wrap.appendChild(mk('div',{style:{fontSize:'20px',color:'var(--gold)',fontFamily:'var(--ft)',lineHeight:'1.1',marginBottom:'2px'}},[String(total)]));
@@ -4217,7 +4223,7 @@ function pgCompanionGeneric(listKey, pageTitle, pageIcon, showBestiary){
     // CA / Iniziativa / Velocità
     body.appendChild(GRID([
       CARD([LBL('CA'),(()=>{const e=mk('div',{style:{fontSize:'20px',color:'var(--gl)',fontFamily:'var(--ft)',textAlign:'center'}},[String(acT)]);return e;})(),(()=>{const inp=mk('input',{type:'number',value:String(comp.bac||10),style:{width:'100%',textAlign:'center',fontSize:'16px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box',marginTop:'4px'}});inp.addEventListener('change',ev=>{C[listKey][ci].bac=Number(ev.target.value)||10;save();render();});return inp;})()],{textAlign:'center',padding:'6px'}),
-      CARD([LBL('Iniziativa'),(()=>{const e=mk('div',{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',textAlign:'center'}},[fm(S.dex)]);e.addEventListener('click',()=>showRoll('1d20'+fm(S.dex),'Iniziativa'));return e;})()],{textAlign:'center',padding:'6px'}),
+      CARD([LBL('Iniziativa'),(()=>{const e=mk('div',{style:{fontSize:'18px',color:'var(--gold)',fontFamily:'var(--ft)',cursor:'pointer',textAlign:'center'}},[fm(S.dex)]);e.addEventListener('click',()=>showRoll('1d20'+fm(S.dex+(C.featInitBonus||0)),'Iniziativa'));return e;})()],{textAlign:'center',padding:'6px'}),
       CARD([LBL('Vel. (m)'),(()=>{const inp=mk('input',{type:'number',value:String(comp.spd||30),style:{width:'100%',textAlign:'center',fontSize:'15px',padding:'4px 2px',border:'none',borderBottom:'1px solid var(--border)',background:'transparent',color:'var(--text)',boxSizing:'border-box'}});inp.addEventListener('change',ev=>{C[listKey][ci].spd=Number(ev.target.value)||0;save();});return inp;})()],{textAlign:'center',padding:'6px'}),
     ],'1fr 1fr 1fr',4,{marginBottom:'6px'}));
     body.appendChild(GRID([
@@ -4762,6 +4768,66 @@ function pgFeatures(){
   return p;
 }
 
+
+// ══════════════════════════════════════════════════════════
+// FEAT_EFFECTS — effetti meccanici dei talenti
+// Ogni talento può avere: passBonus, skBonus, spBonus, statBonus,
+// profBonus, initBonus, acBonus, speedBonus, newProf, condImm
+// ══════════════════════════════════════════════════════════
+const FEAT_EFFECTS={
+  // Osservatore / Observant
+  'Osservatore':{passBonus:{perc:5,intu:0,indag:5}},
+  // Allerta / Alert (2014)
+  'Allerta':{initBonus:5},
+  // Atletico — competenza Atletica
+  'Atletico':{newProf:['atletica']},
+  // Duro a Morire / Tough
+  'Duro a Morire':{toughBonus:true}, // +2 PF per livello (gestito separatamente)
+  // Mobile / Mobile
+  'Mobile':{speedBonus:10},
+  // Armatura Media / Medium Armor Master
+  'Armatura Media':{},  // nessun valore fisso tracciabile
+  // Armatura Pesante / Heavy Armor Master — riduzione danno (non tracciabile)
+  // Furtivo / Skulker — nessun valore fisso
+  // Fortunato / Lucky — nessun valore fisso (risorsa)
+  // Attaccante Selvaggio — nessun valore
+  // Resistente / Resilient — aggiunge competenza in un TS
+  // (gestita manualmente dal giocatore)
+  // Mago Guerriero 2024 / Incantatore Guerriero
+  'Incantatore Guerriero':{},
+  // Telecinetista
+  'Telecinetista':{},
+  // Telepatico
+  'Telepatico':{},
+};
+
+// Applica gli effetti dei talenti attivi ai bonus passivi e iniziativa
+function applyFeatEffects(){
+  if(!C.selectedFeats||!C.selectedFeats.length)return;
+  // Reset bonus derivati dai talenti (non toccare quelli manuali)
+  if(!C._featBonusApplied)C._featBonusApplied={};
+  // Azzerare solo i bonus applicati dai talenti, non i manuali
+  // Usa un campo separato C.featPassBonus
+  C.featPassBonus={perc:0,intu:0,indag:0};
+  C.featInitBonus=0;
+  C.featSpeedBonus=0;
+
+  C.selectedFeats.forEach(ft=>{
+    const eff=FEAT_EFFECTS[ft.name];
+    if(!eff)return;
+    // Bonus percezione passiva
+    if(eff.passBonus){
+      if(eff.passBonus.perc)C.featPassBonus.perc=(C.featPassBonus.perc||0)+eff.passBonus.perc;
+      if(eff.passBonus.intu)C.featPassBonus.intu=(C.featPassBonus.intu||0)+eff.passBonus.intu;
+      if(eff.passBonus.indag)C.featPassBonus.indag=(C.featPassBonus.indag||0)+eff.passBonus.indag;
+    }
+    // Bonus iniziativa
+    if(eff.initBonus)C.featInitBonus=(C.featInitBonus||0)+eff.initBonus;
+    // Bonus velocità
+    if(eff.speedBonus)C.featSpeedBonus=(C.featSpeedBonus||0)+eff.speedBonus;
+  });
+}
+
 function pgSettings(){
   const p=mk('div',{cls:'page'});
   if(!C.hiddenPages)C.hiddenPages=[];
@@ -4993,6 +5059,8 @@ function render(){
   _renderErrorCount=0;
   _isRendering=true;
   try{
+  // Applica effetti meccanici dei talenti prima di costruire le pagine
+  applyFeatEffects();
   const ct=document.getElementById('content');
   if(!ct){_isRendering=false;return;}
   ct.innerHTML='';
