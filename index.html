@@ -538,6 +538,7 @@ const DEF={
   res:[],ins:0,maxIns:1,ds:0,df:0,te:[],
   concentration:null, // {name, duration} incantesimo in concentrazione
   resistances:[], immunities:[], vulnerabilities:[], condImmunities:[],
+  equip:{armor:'',shield:false},
   showXpTracker:false, xpTarget:0,
   pt:"",id:"",bo:"",fl:"",app:"",bs:"",nt:"",img:"",
   coins:{pp:0,gp:0,ep:0,sp:0,cp:0,coinsBag:false},
@@ -648,6 +649,37 @@ function getWarlockLevel(){
   }
   return (C.cls||'').toLowerCase()==='warlock'?(C.lv||0):0;
 }
+// Cache globale database armature (caricata da Supabase)
+let ARMORY_DB = null;
+let ARMORY_LOADING = false;
+
+async function loadArmoryDB(){
+  if(ARMORY_DB !== null || ARMORY_LOADING) return;
+  ARMORY_LOADING = true;
+  try {
+    const { data, error } = await sb.from('user_armory')
+      .select('*')
+      .order('armor_type')
+      .order('ca');
+    if(!error && data) {
+      ARMORY_DB = data;
+    } else {
+      ARMORY_DB = [];
+    }
+  } catch(e) {
+    ARMORY_DB = [];
+  }
+  ARMORY_LOADING = false;
+  render(); // Ricarica la pagina con i dati
+}
+
+function calcArmorACFromDB(armor, desMod){
+  if(!armor) return null;
+  if(armor.des_bonus === 'full') return armor.ca + desMod;
+  if(armor.des_bonus === 'max2') return armor.ca + Math.min(desMod, 2);
+  return armor.ca; // 'none'
+}
+
 // Globale — usata da pgMain, pgCombat, showAttackRoll e altri
 function getClassLevel(className){
   if(C.classes&&C.classes.length>0){
@@ -1845,6 +1877,74 @@ function pgMain(){
   }
   p.appendChild(makePfCard());
 
+  // ── Equipaggiamento (armatura + scudo → aggiorna CA base) ──
+  if(!C.equip)C.equip={armor:'',shield:false};
+  (()=>{
+    const equipCard=CARD([]);
+    equipCard.appendChild(LBL('⚔ Equipaggiato'));
+
+    // Selettore armatura
+    const armRow=ROW([
+      mk('span',{style:{color:'var(--td)',fontSize:'12px',flexShrink:0,minWidth:'64px'}},['Armatura:']),
+      (()=>{
+        const sel=mk('select',{style:{flex:'1',background:'var(--card)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:'var(--r)',padding:'4px 6px',fontSize:'13px'}});
+        sel.appendChild(mk('option',{value:''},'Nessuna / Personalizzata'));
+        ARMOR_DB.forEach(a=>{
+          const o=mk('option',{value:a.name},[a.name+' (CA '+(a.type==='light'?a.ca+'+DES':a.type==='medium'?a.ca+'+DES≤2':a.type==='mage'?a.ca+'+DES':String(a.ca))+')']);
+          if((C.equip.armor||'')===a.name)o.selected=true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change',ev=>{
+          C.equip.armor=ev.target.value;
+          if(ev.target.value){
+            const newBac=calcArmorAc(ev.target.value,S.dex);
+            if(newBac!==null){C.bac=newBac;}
+          }
+          save();render();
+        });
+        return sel;
+      })()
+    ],{gap:'8px',alignItems:'center',marginTop:'6px'});
+    equipCard.appendChild(armRow);
+
+    // Scudo
+    const shieldRow=ROW([
+      mk('span',{style:{color:'var(--td)',fontSize:'12px',flexShrink:0,minWidth:'64px'}},['Scudo:']),
+      (()=>{
+        const chk=CHK(!!C.equip.shield,v=>{
+          C.equip.shield=v;
+          // Aggiorna/rimuovi il modificatore scudo in acm
+          const shieldIdx=(C.acm||[]).findIndex(m=>m._shieldAuto);
+          if(v){
+            if(shieldIdx<0){
+              if(!C.acm)C.acm=[];
+              C.acm.push({n:'Scudo',v:2,on:true,_shieldAuto:true});
+            } else {C.acm[shieldIdx].on=true;}
+          } else {
+            if(shieldIdx>=0)C.acm[shieldIdx].on=false;
+          }
+          save();render();
+        });
+        return chk;
+      })(),
+      mk('span',{style:{color:'var(--td)',fontSize:'12px'}},['(+2 CA automatico)']),
+    ],{gap:'8px',alignItems:'center',marginTop:'6px'});
+    equipCard.appendChild(shieldRow);
+
+    if(C.equip.armor){
+      const arm=ARMOR_DB.find(a=>a.name===C.equip.armor);
+      if(arm){
+        const info=arm.type==='light'?'Leggera · CA '+arm.ca+'+DES':
+          arm.type==='medium'?'Media · CA '+arm.ca+'+DES (max +2)':
+          arm.type==='heavy'?'Pesante · CA '+arm.ca+' fisso':
+          arm.type==='mage'?'Magia · CA '+arm.ca+'+DES':'CA '+arm.ca;
+        const stealth=arm.stealth?'  ·  ⚠ Svantaggio Furtività':'';
+        equipCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'11px',marginTop:'4px',fontFamily:'var(--fb)'}},[info+stealth]));
+      }
+    }
+    p.appendChild(equipCard);
+  })();
+
   // CA
   const caCard=CARD([ROW([
     DIV([LBL('CA'),mk('div',{id:'ac-total',style:{fontSize:'26px',color:'var(--gl)',fontFamily:'var(--ft)',textAlign:'center'}},[String(acT)]),LBL('Base',{marginTop:'2px'}),(()=>{const i=mk('input',{type:'text',value:String(C.bac||10),style:{width:'100%',textAlign:'center'}});i.addEventListener('change',ev=>{C.bac=Number(ev.target.value)||10;const t=(C.bac||10)+(C.acm||[]).filter(m=>m.on).reduce((a,m)=>a+(Number(m.v)||0),0);const el=document.getElementById('ac-total');if(el)el.textContent=String(t);save();});return i;})()],{style:{textAlign:'center',minWidth:'65px'}}),
@@ -2108,8 +2208,12 @@ function pgMain(){
       C.res.push(r);
     } else {
       // aggiorna max/dado ma rispetta eventuali modifiche manuali al nome
+      const oldMax=r.max||0;
       r.max=maxVal;
       r.die=die||r.die||'';
+      // Se il max aumenta e cur era uguale al vecchio max (risorsa piena),
+      // aggiorna cur al nuovo max (risorsa ancora piena dopo level-up)
+      if(maxVal>oldMax && r.cur>=oldMax)r.cur=maxVal;
       if(r.cur>r.max)r.cur=r.max;
       if(!r.n)r.n=name;
     }
@@ -2126,27 +2230,29 @@ function pgMain(){
   }
 
   // ── Chierico: Channel Divinity ──
-  // 2014: 1 uso lv1-5 | 2 usi lv6-17 | 3 usi lv18+   — ricarica Riposo Breve
-  // 2024: 2 usi lv2+  | 3 usi lv6+                    — ricarica Riposo Breve
+  // [2014] 1 uso lv2-5 | 2 usi lv6-17 | 3 usi lv18+ — ricarica Riposo Breve O Lungo
+  // [2024] 2 usi lv2-5 | 3 usi lv6-17 | 4 usi lv18+ — ricarica 1 uso Riposo Breve, tutti Riposo Lungo
+  // Nota: CD si ottiene al lv2 in entrambe le edizioni
   const chiericoLv=getClassLevel('Chierico');
-  if(chiericoLv>0){
+  if(chiericoLv>=2){
     let cdcMax;
     if(ed==='2024'){
-      cdcMax=chiericoLv>=6?3:2; // 2024: parte da 2 usi al lv2
+      cdcMax=chiericoLv>=18?4:chiericoLv>=6?3:2;
     } else {
-      cdcMax=chiericoLv>=18?3:chiericoLv>=6?2:1; // 2014
+      cdcMax=chiericoLv>=18?3:chiericoLv>=6?2:1;
     }
     upsertRes('channel_cleric','Channel Divinity (Chierico)',cdcMax,'short','');
   }
 
   // ── Paladino: Channel Divinity ──
-  // 2014: 1 uso sempre (lv1-20)
-  // 2024: 2 usi lv6+ | 3 usi lv11+                    — ricarica Riposo Breve
+  // [2014] 1 uso sempre (lv1-20) — ricarica Riposo Breve O Lungo
+  // [2024] 2 usi lv3+ | 3 usi lv11+ — ricarica 1 uso Riposo Breve, tutti Riposo Lungo
+  // Nota: CD si ottiene al lv3 in entrambe le edizioni
   const paladinoLv=getClassLevel('Paladino');
-  if(paladinoLv>0){
+  if(paladinoLv>=3){
     let cdpMax;
     if(ed==='2024'){
-      cdpMax=paladinoLv>=11?3:paladinoLv>=6?2:1;
+      cdpMax=paladinoLv>=11?3:2;
     } else {
       cdpMax=1; // 2014: sempre 1 uso
     }
@@ -2980,6 +3086,7 @@ function pgCombat(){
     condImmSec.appendChild(mk('div',{style:{color:'var(--gold)',fontSize:'10px',fontFamily:'var(--ft)',letterSpacing:'1px',marginBottom:'4px'}},['IMMUNITÀ CONDIZIONI']));
     const condChips=mk('div',{style:{display:'flex',flexWrap:'wrap',gap:'4px',marginBottom:'4px'}});
     if(!C.condImmunities)C.condImmunities=[];
+  if(!C.equip)C.equip={armor:'',shield:false};
     (C.condImmunities||[]).forEach((cond,ci2)=>{
       const chip=mk('span',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'8px',border:'1px solid var(--gold)',color:'var(--gold)',background:'rgba(201,168,76,0.1)',display:'inline-flex',alignItems:'center',gap:'4px',cursor:'pointer'}});
       chip.appendChild(mk('span',null,[cond]));
@@ -3414,6 +3521,263 @@ function pgInventory(){
 
   p.appendChild(coinsCard);
   p.appendChild(invSearchInp);
+
+  // ── EQUIPAGGIAMENTO ──
+  if(!C.equip)C.equip={items:[]};
+  if(!Array.isArray(C.equip.items))C.equip.items=[];
+
+  const equipCard=CARD([]);
+  equipCard.appendChild(ROW([
+    LBL('⚔ Equipaggiato',{marginBottom:'0'}),
+    BTN('+ Aggiungi',()=>{
+      // Apre modal per aggiungere pezzo equipaggiamento
+      showEquipModal();
+    },'sm')
+  ],{justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}));
+
+  // Calcola CA totale dall'equipaggiamento
+  let equipAcBase = null;
+  let equipAcMod = 0;
+  let equipStealthDisadv = false;
+
+  (C.equip.items||[]).forEach((item,ei)=>{
+    const itemCard=mk('div',{style:{
+      marginBottom:'6px',
+      border:'1px solid '+(item.worn?'var(--gold)':'var(--border)'),
+      borderRadius:'var(--r)',
+      padding:'8px 10px',
+      background:item.worn?'rgba(201,168,76,0.06)':'transparent',
+      transition:'all 0.2s'
+    }});
+
+    // Accumula effetti CA
+    if(item.worn){
+      if(item.armor_type==='shield'){
+        equipAcMod+=item.ca||0;
+      } else if(item.armor_type&&item.armor_type!=='none'){
+        equipAcBase=calcArmorACFromDB(item, sm(C.dex||10));
+      }
+      if(item.stealth)equipStealthDisadv=true;
+    }
+
+    const nameRow=ROW([
+      // Toggle indossato
+      (()=>{
+        const tog=mk('button',{
+          cls:item.worn?'gold sm':'sm ghost',
+          style:{padding:'2px 8px',fontSize:'11px',flexShrink:0}
+        },[item.worn?'✓ Indossato':'Indossa']);
+        tog.addEventListener('click',()=>{
+          // Se è un'armatura (non scudo), togli le altre armature
+          if(item.armor_type&&item.armor_type!=='shield'&&item.armor_type!=='none'){
+            if(!item.worn){
+              C.equip.items.forEach((it,j)=>{
+                if(j!==ei&&it.armor_type&&it.armor_type!=='shield'&&it.armor_type!=='none')
+                  C.equip.items[j].worn=false;
+              });
+            }
+          }
+          C.equip.items[ei].worn=!item.worn;
+          // Aggiorna CA base automaticamente
+          updateEquipCA();
+          save();render();
+        });
+        return tog;
+      })(),
+      mk('span',{style:{
+        flex:'1',
+        fontFamily:'var(--fb)',
+        fontSize:'14px',
+        color:item.worn?'var(--gl)':'var(--text)',
+        marginLeft:'8px'
+      }},[item.name||'?']),
+      mk('span',{style:{color:'var(--td)',fontSize:'11px',marginRight:'8px'}},[
+        item.armor_type==='shield'?'+'+item.ca+' CA':
+        item.armor_type==='light'?'CA '+(item.ca)+'+ DES':
+        item.armor_type==='medium'?'CA '+(item.ca)+'+ DES≤2':
+        item.armor_type==='heavy'?'CA '+(item.ca)+' fisso':
+        item.ca?'CA '+item.ca:''
+      ]),
+      item.stealth?mk('span',{style:{color:'var(--rl)',fontSize:'10px',marginRight:'6px'}},['⚠ Furtività']):'',
+      item.str_req&&item.str_req>0?mk('span',{style:{color:'var(--td)',fontSize:'10px',marginRight:'6px'}},['FOR '+item.str_req+'+']):'',
+      BTN('✕',()=>{C.equip.items.splice(ei,1);updateEquipCA();save();render();},'ghost sm')
+    ],{alignItems:'center'});
+    itemCard.appendChild(nameRow);
+    if(item.notes){
+      itemCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'11px',marginTop:'4px',paddingLeft:'4px'}},[item.notes]));
+    }
+    equipCard.appendChild(itemCard);
+  });
+
+  // Mostra effetto CA attivo
+  if(equipAcBase!==null||equipAcMod!==0){
+    const caEff=mk('div',{style:{
+      marginTop:'6px',padding:'6px 10px',
+      background:'rgba(201,168,76,0.08)',
+      borderRadius:'var(--r)',
+      border:'1px solid rgba(201,168,76,0.3)'
+    }});
+    const baseVal=equipAcBase!==null?equipAcBase:(C.bac||10);
+    const total=baseVal+equipAcMod;
+    caEff.appendChild(ROW([
+      mk('span',{style:{color:'var(--td)',fontSize:'12px'}},['CA calcolata dall\u2019equipaggiamento:']),
+      mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'16px'}},[String(total)]),
+    ],{justifyContent:'space-between',alignItems:'center'}));
+    if(equipStealthDisadv){
+      caEff.appendChild(mk('div',{style:{color:'var(--rl)',fontSize:'11px',marginTop:'2px'}},['⚠ Svantaggio alla Furtività per armatura indossata']));
+    }
+    equipCard.appendChild(caEff);
+  }
+
+  if((C.equip.items||[]).length===0){
+    equipCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'8px'}},['Nessun equipaggiamento — clicca + Aggiungi']));
+  }
+
+  p.appendChild(equipCard);
+
+  // Funzione per aggiornare CA base dall'equipaggiamento
+  function updateEquipCA(){
+    let newBase=null;
+    let newMod=0;
+    (C.equip.items||[]).forEach(it=>{
+      if(!it.worn)return;
+      if(it.armor_type==='shield'){newMod+=it.ca||0;}
+      else if(it.armor_type&&it.armor_type!=='none'){newBase=calcArmorACFromDB(it,sm(C.dex||10));}
+    });
+    if(newBase!==null)C.bac=newBase;
+    // Aggiorna modificatori scudo in acm
+    const shieldIdx=(C.acm||[]).findIndex(m=>m._shieldAuto);
+    if(newMod>0){
+      if(!C.acm)C.acm=[];
+      if(shieldIdx>=0){C.acm[shieldIdx].v=newMod;C.acm[shieldIdx].on=true;}
+      else C.acm.push({n:'Scudo',v:newMod,on:true,_shieldAuto:true});
+    } else {
+      if(shieldIdx>=0)C.acm[shieldIdx].on=false;
+    }
+  }
+
+  // Modal aggiunta equipaggiamento
+  function showEquipModal(){
+    const armory=ARMORY_DB||(()=>{
+      // Fallback locale se DB non caricato
+      loadArmoryDB();
+      return ARMOR_DB||[];
+    })();
+
+    const box=CARD([]);
+    box.style.maxWidth='380px';
+    box.style.width='100%';
+
+    box.appendChild(ROW([
+      mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'14px'}},['⚔ Aggiungi Equipaggiamento']),
+      BTN('✕',closeModal,'ghost sm')
+    ],{justifyContent:'space-between',marginBottom:'10px'}));
+
+    // Ricerca
+    const srch=mk('input',{type:'text',placeholder:'🔍 Cerca armatura...',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px',boxSizing:'border-box'}});
+    box.appendChild(srch);
+
+    const listDiv=mk('div',{style:{maxHeight:'300px',overflowY:'auto',display:'flex',flexDirection:'column',gap:'4px'}});
+
+    function renderArmoryList(q){
+      listDiv.innerHTML='';
+      const filtered=(armory||[]).filter(a=>{
+        if(!q)return true;
+        return (a.name||'').toLowerCase().includes(q.toLowerCase());
+      });
+      // Raggruppa per tipo
+      const types=['light','medium','heavy','shield','special'];
+      const typeLabels={light:'⚡ Leggera',medium:'🛡 Media',heavy:'⚔ Pesante',shield:'🛡 Scudo',special:'✨ Speciale'};
+      types.forEach(t=>{
+        const items=filtered.filter(a=>a.armor_type===t);
+        if(!items.length)return;
+        listDiv.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',padding:'4px 0 2px'}},[(typeLabels[t]||t).toUpperCase()]));
+        items.forEach(arm=>{
+          const alreadyAdded=(C.equip.items||[]).some(it=>it.name===arm.name);
+          const row=mk('div',{style:{
+            display:'flex',alignItems:'center',gap:'6px',
+            padding:'6px 8px',borderRadius:'var(--r)',
+            border:'1px solid '+(alreadyAdded?'var(--gold)':'var(--border)'),
+            background:alreadyAdded?'rgba(201,168,76,0.08)':'transparent',
+            cursor:alreadyAdded?'default':'pointer'
+          }});
+          const nameCol=mk('div',{style:{flex:'1',minWidth:0}});
+          nameCol.appendChild(mk('div',{style:{fontFamily:'var(--fb)',fontSize:'13px',color:alreadyAdded?'var(--gl)':'var(--text)'}},[arm.name]));
+          if(arm.notes)nameCol.appendChild(mk('div',{style:{fontSize:'10px',color:'var(--tk)'}},[arm.notes]));
+          const caStr=arm.armor_type==='light'?arm.ca+'+ DES':
+            arm.armor_type==='medium'?arm.ca+'+ DES≤2':
+            arm.armor_type==='heavy'?String(arm.ca)+' fisso':
+            arm.armor_type==='shield'?'+'+arm.ca:String(arm.ca);
+          row.appendChild(nameCol);
+          row.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px',flexShrink:0}},['CA '+caStr]));
+          if(arm.stealth)row.appendChild(mk('span',{style:{color:'var(--rl)',fontSize:'10px',flexShrink:0}},['⚠']));
+          if(!alreadyAdded){
+            const addB=BTN('+',()=>{
+              if(!C.equip.items)C.equip.items=[];
+              C.equip.items.push({
+                name:arm.name,ca:arm.ca,armor_type:arm.armor_type,
+                des_bonus:arm.des_bonus,stealth:arm.stealth,
+                str_req:arm.str_req||0,notes:arm.notes||'',
+                worn:false,is_default:arm.is_default,
+                armory_id:arm.id
+              });
+              save();closeModal();render();
+            },'sm',{style:{flexShrink:0}});
+            addB.addEventListener('click',ev=>ev.stopPropagation());
+            row.appendChild(addB);
+          } else {
+            row.appendChild(mk('span',{style:{color:'var(--gold)',fontSize:'12px',flexShrink:0}},['✓']));
+          }
+          listDiv.appendChild(row);
+        });
+      });
+
+      // Armatura custom
+      listDiv.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',padding:'8px 0 2px'}},['PERSONALIZZATA']));
+      const customRow=mk('div',{style:{display:'flex',flexDirection:'column',gap:'4px',padding:'8px',border:'1px solid var(--border)',borderRadius:'var(--r)'}});
+      const cName=mk('input',{type:'text',placeholder:'Nome armatura',style:{width:'100%',fontSize:'13px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',marginBottom:'4px',boxSizing:'border-box'}});
+      const cCa=mk('input',{type:'number',placeholder:'CA',style:{width:'60px',fontSize:'13px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',textAlign:'center'}});
+      const cType=mk('select',{style:{flex:'1',fontSize:'12px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}});
+      [{v:'light',l:'Leggera (CA+DES)'},{v:'medium',l:'Media (CA+DES≤2)'},{v:'heavy',l:'Pesante (CA fisso)'},{v:'shield',l:'Scudo (+CA)'},{v:'special',l:'Speciale (CA+DES)'}].forEach(({v,l})=>{
+        cType.appendChild(mk('option',{value:v},[l]));
+      });
+      const cStl=CHK(false,()=>{});
+      const cNotes=mk('input',{type:'text',placeholder:'Note (opzionale)',style:{width:'100%',fontSize:'12px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',boxSizing:'border-box'}});
+      customRow.appendChild(cName);
+      customRow.appendChild(ROW([cCa,cType],{gap:'6px'}));
+      customRow.appendChild(ROW([cStl,mk('span',{style:{fontSize:'12px',color:'var(--td)'}},['Svantaggio Furtività'])],{gap:'6px',marginTop:'4px',alignItems:'center'}));
+      customRow.appendChild(cNotes);
+
+      const saveCustom=BTN('💾 Aggiungi e Salva nel database',async()=>{
+        const nm=cName.value.trim();
+        const ca=Number(cCa.value)||10;
+        const at=cType.value;
+        const des_bonus=at==='light'||at==='special'?'full':at==='medium'?'max2':'none';
+        const stl=cStl.querySelector('input')?.checked||false;
+        const notes=cNotes.value.trim();
+        if(!nm){alert('Inserisci un nome');return;}
+        // Salva su Supabase
+        try{
+          const {data,error}=await sb.from('user_armory').insert({
+            user_id:sbUser.id,name:nm,ca,armor_type:at,des_bonus,
+            stealth:stl,str_req:0,notes,is_default:false
+          }).select().single();
+          if(!error&&data){
+            if(ARMORY_DB)ARMORY_DB.push(data);
+            C.equip.items.push({name:nm,ca,armor_type:at,des_bonus,stealth:stl,str_req:0,notes,worn:false,armory_id:data.id});
+            save();closeModal();render();
+          } else { alert('Errore salvataggio: '+(error?.message||'sconosciuto')); }
+        }catch(e){alert('Errore: '+e.message);}
+      },'gold',{style:{width:'100%',marginTop:'6px'}});
+      customRow.appendChild(saveCustom);
+      listDiv.appendChild(customRow);
+    }
+
+    srch.addEventListener('input',ev=>renderArmoryList(ev.target.value));
+    renderArmoryList('');
+    box.appendChild(listDiv);
+    showModal(box);
+  }
 
   // ── Peso Inventario ──
   const carryNormal=C.str*5;
@@ -4769,6 +5133,43 @@ function pgFeatures(){
 }
 
 
+
+// ══════════════════════════════════════════════════════════
+// ARMOR_DB — Database armature con CA base e tipo
+// tipo: 'light' = 11+DES, 'medium' = base+min(DES,2), 'heavy' = base fisso
+// ══════════════════════════════════════════════════════════
+const ARMOR_DB=[
+  // Armature Leggere
+  {name:'Imbottita',ca:11,type:'light',stealth:'svantaggio'},
+  {name:'Cuoio',ca:11,type:'light'},
+  {name:'Cuoio Borchiato',ca:12,type:'light'},
+  // Armature Medie
+  {name:'Cotta di Maglia',ca:13,type:'medium'},
+  {name:'Scaglie',ca:14,type:'medium',stealth:'svantaggio'},
+  {name:'Corazza a Strisce',ca:15,type:'medium',stealth:'svantaggio'},
+  {name:'Mezza Armatura',ca:15,type:'medium',stealth:'svantaggio'},
+  {name:'Corazza',ca:16,type:'medium'},
+  // Armature Pesanti
+  {name:'Anelli',ca:14,type:'heavy',stealth:'svantaggio'},
+  {name:'Cotta di Maglie',ca:16,type:'heavy',stealth:'svantaggio'},
+  {name:'Piastre Parziali',ca:17,type:'heavy',stealth:'svantaggio'},
+  {name:'Armatura Completa',ca:18,type:'heavy',stealth:'svantaggio'},
+  // Speciale
+  {name:'Armatura del Mago',ca:13,type:'mage'}, // 13+DES
+  {name:'Nessuna (senza armatura)',ca:10,type:'unarmored'},
+];
+
+// Calcola CA base dall'armatura equipaggiata
+function calcArmorAc(armorName, desMod){
+  const arm=ARMOR_DB.find(a=>a.name===armorName);
+  if(!arm)return null;
+  if(arm.type==='light')return arm.ca+desMod;
+  if(arm.type==='medium')return arm.ca+Math.min(desMod,2);
+  if(arm.type==='heavy')return arm.ca;
+  if(arm.type==='mage')return arm.ca+desMod;
+  return arm.ca+desMod; // unarmored
+}
+
 // ══════════════════════════════════════════════════════════
 // FEAT_EFFECTS — effetti meccanici dei talenti
 // Ogni talento può avere: passBonus, skBonus, spBonus, statBonus,
@@ -5676,6 +6077,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     // ── LOGGATO ──
     sbUser = session.user;
+    loadArmoryDB(); // Carica database armature account
     if (loginBtn) loginBtn.style.display  = 'none';
     if (userInfo) userInfo.style.display  = 'flex';
     if (userName) userName.textContent    = sbUser.email.split('@')[0];
