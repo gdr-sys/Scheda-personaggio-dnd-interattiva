@@ -3526,258 +3526,135 @@ function pgInventory(){
   if(!C.equip)C.equip={items:[]};
   if(!Array.isArray(C.equip.items))C.equip.items=[];
 
-  const equipCard=CARD([]);
-  equipCard.appendChild(ROW([
-    LBL('⚔ Equipaggiato',{marginBottom:'0'}),
-    BTN('+ Aggiungi',()=>{
-      // Apre modal per aggiungere pezzo equipaggiamento
-      showEquipModal();
-    },'sm')
-  ],{justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}));
-
-  // Calcola CA totale dall'equipaggiamento
-  let equipAcBase = null;
-  let equipAcMod = 0;
-  let equipStealthDisadv = false;
-
-  (C.equip.items||[]).forEach((item,ei)=>{
-    const itemCard=mk('div',{style:{
-      marginBottom:'6px',
-      border:'1px solid '+(item.worn?'var(--gold)':'var(--border)'),
-      borderRadius:'var(--r)',
-      padding:'8px 10px',
-      background:item.worn?'rgba(201,168,76,0.06)':'transparent',
-      transition:'all 0.2s'
-    }});
-
-    // Accumula effetti CA
-    if(item.worn){
-      if(item.armor_type==='shield'){
-        equipAcMod+=item.ca||0;
-      } else if(item.armor_type&&item.armor_type!=='none'){
-        equipAcBase=calcArmorACFromDB(item, sm(C.dex||10));
-      }
-      if(item.stealth)equipStealthDisadv=true;
-    }
-
-    const nameRow=ROW([
-      // Toggle indossato
-      (()=>{
-        const tog=mk('button',{
-          cls:item.worn?'gold sm':'sm ghost',
-          style:{padding:'2px 8px',fontSize:'11px',flexShrink:0}
-        },[item.worn?'✓ Indossato':'Indossa']);
-        tog.addEventListener('click',()=>{
-          // Se è un'armatura (non scudo), togli le altre armature
-          if(item.armor_type&&item.armor_type!=='shield'&&item.armor_type!=='none'){
-            if(!item.worn){
-              C.equip.items.forEach((it,j)=>{
-                if(j!==ei&&it.armor_type&&it.armor_type!=='shield'&&it.armor_type!=='none')
-                  C.equip.items[j].worn=false;
-              });
-            }
-          }
-          C.equip.items[ei].worn=!item.worn;
-          // Aggiorna CA base automaticamente
-          updateEquipCA();
-          save();render();
-        });
-        return tog;
-      })(),
-      mk('span',{style:{
-        flex:'1',
-        fontFamily:'var(--fb)',
-        fontSize:'14px',
-        color:item.worn?'var(--gl)':'var(--text)',
-        marginLeft:'8px'
-      }},[item.name||'?']),
-      mk('span',{style:{color:'var(--td)',fontSize:'11px',marginRight:'8px'}},[
-        item.armor_type==='shield'?'+'+item.ca+' CA':
-        item.armor_type==='light'?'CA '+(item.ca)+'+ DES':
-        item.armor_type==='medium'?'CA '+(item.ca)+'+ DES≤2':
-        item.armor_type==='heavy'?'CA '+(item.ca)+' fisso':
-        item.ca?'CA '+item.ca:''
-      ]),
-      item.stealth?mk('span',{style:{color:'var(--rl)',fontSize:'10px',marginRight:'6px'}},['⚠ Furtività']):'',
-      item.str_req&&item.str_req>0?mk('span',{style:{color:'var(--td)',fontSize:'10px',marginRight:'6px'}},['FOR '+item.str_req+'+']):'',
-      BTN('✕',()=>{C.equip.items.splice(ei,1);updateEquipCA();save();render();},'ghost sm')
-    ],{alignItems:'center'});
-    itemCard.appendChild(nameRow);
-    if(item.notes){
-      itemCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'11px',marginTop:'4px',paddingLeft:'4px'}},[item.notes]));
-    }
-    equipCard.appendChild(itemCard);
-  });
-
-  // Mostra effetto CA attivo
-  if(equipAcBase!==null||equipAcMod!==0){
-    const caEff=mk('div',{style:{
-      marginTop:'6px',padding:'6px 10px',
-      background:'rgba(201,168,76,0.08)',
-      borderRadius:'var(--r)',
-      border:'1px solid rgba(201,168,76,0.3)'
-    }});
-    const baseVal=equipAcBase!==null?equipAcBase:(C.bac||10);
-    const total=baseVal+equipAcMod;
-    caEff.appendChild(ROW([
-      mk('span',{style:{color:'var(--td)',fontSize:'12px'}},['CA calcolata dall\u2019equipaggiamento:']),
-      mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'16px'}},[String(total)]),
-    ],{justifyContent:'space-between',alignItems:'center'}));
-    if(equipStealthDisadv){
-      caEff.appendChild(mk('div',{style:{color:'var(--rl)',fontSize:'11px',marginTop:'2px'}},['⚠ Svantaggio alla Furtività per armatura indossata']));
-    }
-    equipCard.appendChild(caEff);
-  }
-
-  if((C.equip.items||[]).length===0){
-    equipCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'8px'}},['Nessun equipaggiamento — clicca + Aggiungi']));
-  }
-
-  p.appendChild(equipCard);
-
-  // Funzione per aggiornare CA base dall'equipaggiamento
   function updateEquipCA(){
-    let newBase=null;
-    let newMod=0;
+    let newBase=null,newMod=0;
     (C.equip.items||[]).forEach(it=>{
       if(!it.worn)return;
       if(it.armor_type==='shield'){newMod+=it.ca||0;}
       else if(it.armor_type&&it.armor_type!=='none'){newBase=calcArmorACFromDB(it,sm(C.dex||10));}
     });
     if(newBase!==null)C.bac=newBase;
-    // Aggiorna modificatori scudo in acm
-    const shieldIdx=(C.acm||[]).findIndex(m=>m._shieldAuto);
-    if(newMod>0){
-      if(!C.acm)C.acm=[];
-      if(shieldIdx>=0){C.acm[shieldIdx].v=newMod;C.acm[shieldIdx].on=true;}
-      else C.acm.push({n:'Scudo',v:newMod,on:true,_shieldAuto:true});
-    } else {
-      if(shieldIdx>=0)C.acm[shieldIdx].on=false;
-    }
+    const si=(C.acm||[]).findIndex(m=>m._shieldAuto);
+    if(newMod>0){if(!C.acm)C.acm=[];if(si>=0){C.acm[si].v=newMod;C.acm[si].on=true;}else C.acm.push({n:'Scudo',v:newMod,on:true,_shieldAuto:true});}
+    else{if(si>=0)C.acm[si].on=false;}
   }
 
-  // Modal aggiunta equipaggiamento
-  function showEquipModal(){
-    const armory=ARMORY_DB||(()=>{
-      // Fallback locale se DB non caricato
-      loadArmoryDB();
-      return ARMOR_DB||[];
-    })();
+  const equipCard=CARD([]);
+  equipCard.appendChild(LBL('\u2694 Equipaggiato'));
 
-    const box=CARD([]);
-    box.style.maxWidth='380px';
-    box.style.width='100%';
-
-    box.appendChild(ROW([
-      mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'14px'}},['⚔ Aggiungi Equipaggiamento']),
-      BTN('✕',closeModal,'ghost sm')
-    ],{justifyContent:'space-between',marginBottom:'10px'}));
-
-    // Ricerca
-    const srch=mk('input',{type:'text',placeholder:'🔍 Cerca armatura...',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px',boxSizing:'border-box'}});
-    box.appendChild(srch);
-
-    const listDiv=mk('div',{style:{maxHeight:'300px',overflowY:'auto',display:'flex',flexDirection:'column',gap:'4px'}});
-
-    function renderArmoryList(q){
-      listDiv.innerHTML='';
-      const filtered=(armory||[]).filter(a=>{
-        if(!q)return true;
-        return (a.name||'').toLowerCase().includes(q.toLowerCase());
-      });
-      // Raggruppa per tipo
-      const types=['light','medium','heavy','shield','special'];
-      const typeLabels={light:'⚡ Leggera',medium:'🛡 Media',heavy:'⚔ Pesante',shield:'🛡 Scudo',special:'✨ Speciale'};
-      types.forEach(t=>{
-        const items=filtered.filter(a=>a.armor_type===t);
-        if(!items.length)return;
-        listDiv.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',padding:'4px 0 2px'}},[(typeLabels[t]||t).toUpperCase()]));
-        items.forEach(arm=>{
-          const alreadyAdded=(C.equip.items||[]).some(it=>it.name===arm.name);
-          const row=mk('div',{style:{
-            display:'flex',alignItems:'center',gap:'6px',
-            padding:'6px 8px',borderRadius:'var(--r)',
-            border:'1px solid '+(alreadyAdded?'var(--gold)':'var(--border)'),
-            background:alreadyAdded?'rgba(201,168,76,0.08)':'transparent',
-            cursor:alreadyAdded?'default':'pointer'
-          }});
-          const nameCol=mk('div',{style:{flex:'1',minWidth:0}});
-          nameCol.appendChild(mk('div',{style:{fontFamily:'var(--fb)',fontSize:'13px',color:alreadyAdded?'var(--gl)':'var(--text)'}},[arm.name]));
-          if(arm.notes)nameCol.appendChild(mk('div',{style:{fontSize:'10px',color:'var(--tk)'}},[arm.notes]));
-          const caStr=arm.armor_type==='light'?arm.ca+'+ DES':
-            arm.armor_type==='medium'?arm.ca+'+ DES≤2':
-            arm.armor_type==='heavy'?String(arm.ca)+' fisso':
-            arm.armor_type==='shield'?'+'+arm.ca:String(arm.ca);
-          row.appendChild(nameCol);
-          row.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px',flexShrink:0}},['CA '+caStr]));
-          if(arm.stealth)row.appendChild(mk('span',{style:{color:'var(--rl)',fontSize:'10px',flexShrink:0}},['⚠']));
-          if(!alreadyAdded){
-            const addB=BTN('+',()=>{
-              if(!C.equip.items)C.equip.items=[];
-              C.equip.items.push({
-                name:arm.name,ca:arm.ca,armor_type:arm.armor_type,
-                des_bonus:arm.des_bonus,stealth:arm.stealth,
-                str_req:arm.str_req||0,notes:arm.notes||'',
-                worn:false,is_default:arm.is_default,
-                armory_id:arm.id
-              });
-              save();closeModal();render();
-            },'sm',{style:{flexShrink:0}});
-            addB.addEventListener('click',ev=>ev.stopPropagation());
-            row.appendChild(addB);
-          } else {
-            row.appendChild(mk('span',{style:{color:'var(--gold)',fontSize:'12px',flexShrink:0}},['✓']));
-          }
-          listDiv.appendChild(row);
-        });
-      });
-
-      // Armatura custom
-      listDiv.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',padding:'8px 0 2px'}},['PERSONALIZZATA']));
-      const customRow=mk('div',{style:{display:'flex',flexDirection:'column',gap:'4px',padding:'8px',border:'1px solid var(--border)',borderRadius:'var(--r)'}});
-      const cName=mk('input',{type:'text',placeholder:'Nome armatura',style:{width:'100%',fontSize:'13px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',marginBottom:'4px',boxSizing:'border-box'}});
-      const cCa=mk('input',{type:'number',placeholder:'CA',style:{width:'60px',fontSize:'13px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',textAlign:'center'}});
-      const cType=mk('select',{style:{flex:'1',fontSize:'12px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}});
-      [{v:'light',l:'Leggera (CA+DES)'},{v:'medium',l:'Media (CA+DES≤2)'},{v:'heavy',l:'Pesante (CA fisso)'},{v:'shield',l:'Scudo (+CA)'},{v:'special',l:'Speciale (CA+DES)'}].forEach(({v,l})=>{
-        cType.appendChild(mk('option',{value:v},[l]));
-      });
-      const cStl=CHK(false,()=>{});
-      const cNotes=mk('input',{type:'text',placeholder:'Note (opzionale)',style:{width:'100%',fontSize:'12px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',boxSizing:'border-box'}});
-      customRow.appendChild(cName);
-      customRow.appendChild(ROW([cCa,cType],{gap:'6px'}));
-      customRow.appendChild(ROW([cStl,mk('span',{style:{fontSize:'12px',color:'var(--td)'}},['Svantaggio Furtività'])],{gap:'6px',marginTop:'4px',alignItems:'center'}));
-      customRow.appendChild(cNotes);
-
-      const saveCustom=BTN('💾 Aggiungi e Salva nel database',async()=>{
-        const nm=cName.value.trim();
-        const ca=Number(cCa.value)||10;
-        const at=cType.value;
-        const des_bonus=at==='light'||at==='special'?'full':at==='medium'?'max2':'none';
-        const stl=cStl.querySelector('input')?.checked||false;
-        const notes=cNotes.value.trim();
-        if(!nm){alert('Inserisci un nome');return;}
-        // Salva su Supabase
-        try{
-          const {data,error}=await sb.from('user_armory').insert({
-            user_id:sbUser.id,name:nm,ca,armor_type:at,des_bonus,
-            stealth:stl,str_req:0,notes,is_default:false
-          }).select().single();
-          if(!error&&data){
-            if(ARMORY_DB)ARMORY_DB.push(data);
-            C.equip.items.push({name:nm,ca,armor_type:at,des_bonus,stealth:stl,str_req:0,notes,worn:false,armory_id:data.id});
-            save();closeModal();render();
-          } else { alert('Errore salvataggio: '+(error?.message||'sconosciuto')); }
-        }catch(e){alert('Errore: '+e.message);}
-      },'gold',{style:{width:'100%',marginTop:'6px'}});
-      customRow.appendChild(saveCustom);
-      listDiv.appendChild(customRow);
+  // Lista oggetti equipaggiati
+  let eqAcBase=null,eqAcMod=0,eqStlDisadv=false;
+  const equippedDiv=mk('div',{style:{marginBottom:'8px'}});
+  (C.equip.items||[]).forEach((item,ei)=>{
+    if(item.worn){
+      if(item.armor_type==='shield')eqAcMod+=item.ca||0;
+      else if(item.armor_type&&item.armor_type!=='none')eqAcBase=calcArmorACFromDB(item,sm(C.dex||10));
+      if(item.stealth)eqStlDisadv=true;
     }
+    const row=mk('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'6px 8px',marginBottom:'3px',border:'1px solid '+(item.worn?'var(--gold)':'var(--border)'),borderRadius:'var(--r)',background:item.worn?'rgba(201,168,76,0.07)':'transparent'}});
+    const tog=mk('button',{cls:item.worn?'gold sm':'sm ghost',style:{padding:'2px 8px',fontSize:'11px',flexShrink:0,minWidth:'78px'}},[item.worn?'\u2713 Indosso':'Indossa']);
+    tog.addEventListener('click',function(){
+      if(item.armor_type&&item.armor_type!=='shield'&&item.armor_type!=='none'&&!item.worn)
+        C.equip.items.forEach(function(it,j){if(j!==ei&&it.armor_type&&it.armor_type!=='shield'&&it.armor_type!=='none')C.equip.items[j].worn=false;});
+      C.equip.items[ei].worn=!item.worn;updateEquipCA();save();render();
+    });
+    row.appendChild(tog);
+    row.appendChild(mk('span',{style:{flex:'1',fontFamily:'var(--fb)',fontSize:'13px',color:item.worn?'var(--gl)':'var(--text)',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},[item.name||'?']));
+    const cs=item.armor_type==='shield'?'+'+item.ca+' CA':item.armor_type==='heavy'?'CA '+item.ca+' fisso':item.armor_type==='medium'?'CA '+item.ca+'+DES\u22642':item.ca?'CA '+item.ca+'+DES':'';
+    row.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px',flexShrink:0}},[cs]));
+    if(item.stealth)row.appendChild(mk('span',{style:{color:'var(--rl)',fontSize:'10px',flexShrink:0}},['\u26a0 Furt.']));
+    if(item.str_req&&item.str_req>0&&(C.str||10)<item.str_req)row.appendChild(mk('span',{style:{color:'var(--rl)',fontSize:'10px',flexShrink:0}},['\u26a0 FOR'+item.str_req]));
+    row.appendChild(BTN('\u2715',function(){C.equip.items.splice(ei,1);updateEquipCA();save();render();},'ghost sm',{style:{flexShrink:0}}));
+    equippedDiv.appendChild(row);
+  });
+  if(!(C.equip.items||[]).length)equippedDiv.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',padding:'4px 0 8px'}},['Nessun pezzo equipaggiato']));
+  equipCard.appendChild(equippedDiv);
 
-    srch.addEventListener('input',ev=>renderArmoryList(ev.target.value));
-    renderArmoryList('');
-    box.appendChild(listDiv);
-    showModal(box);
+  if(eqAcBase!==null||eqAcMod!==0){
+    const total=(eqAcBase!==null?eqAcBase:(C.bac||10))+eqAcMod;
+    equipCard.appendChild(ROW([mk('span',{style:{color:'var(--td)',fontSize:'12px'}},['CA calcolata:']),mk('span',{style:{color:'var(--gl)',fontFamily:'var(--ft)',fontSize:'16px'}},[String(total)])],{justifyContent:'space-between',marginBottom:'4px'}));
+    if(eqStlDisadv)equipCard.appendChild(mk('div',{style:{color:'var(--rl)',fontSize:'11px',marginBottom:'6px'}},['\u26a0 Svantaggio Furtivit\u00e0']));
   }
+
+  equipCard.appendChild(mk('div',{style:{height:'1px',background:'var(--border)',margin:'6px 0 10px'}}));
+
+  // Database armature inline
+  const armSrch=mk('input',{type:'text',placeholder:'Cerca armatura...',style:{width:'100%',fontSize:'13px',padding:'5px 8px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'6px',color:'var(--text)',marginBottom:'8px',boxSizing:'border-box'}});
+  equipCard.appendChild(armSrch);
+  const armListDiv=mk('div',{style:{maxHeight:'320px',overflowY:'auto',display:'flex',flexDirection:'column',gap:'2px'}});
+  equipCard.appendChild(armListDiv);
+
+  function renderArmoryInline(q){
+    armListDiv.innerHTML='';
+    const armory=ARMORY_DB||[];
+    if(!armory.length){
+      armListDiv.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'16px'}},['Caricamento database...']));
+      setTimeout(function(){renderArmoryInline(armSrch.value);},1000);
+      return;
+    }
+    const types=['light','medium','heavy','shield','special'];
+    const tLbls={light:'Leggera',medium:'Media',heavy:'Pesante',shield:'Scudo',special:'Speciale'};
+    let found=false;
+    types.forEach(function(t){
+      const items=armory.filter(function(a){return a.armor_type===t&&(!q||(a.name||'').toLowerCase().includes(q.toLowerCase())||(a.notes||'').toLowerCase().includes(q.toLowerCase()));});
+      if(!items.length)return;
+      found=true;
+      armListDiv.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',padding:'6px 4px 2px',textTransform:'uppercase'}},[tLbls[t]||t]));
+      items.forEach(function(arm){
+        const added=(C.equip.items||[]).some(function(it){return it.name===arm.name;});
+        const ar=mk('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'5px 8px',borderRadius:'var(--r)',border:'1px solid '+(added?'rgba(201,168,76,0.4)':'var(--border)'),background:added?'rgba(201,168,76,0.05)':'transparent',marginBottom:'2px'}});
+        const nc=mk('div',{style:{flex:'1',minWidth:0}});
+        nc.appendChild(mk('div',{style:{fontFamily:'var(--fb)',fontSize:'13px',color:added?'var(--gl)':'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},[arm.name]));
+        if(arm.notes)nc.appendChild(mk('div',{style:{fontSize:'10px',color:'var(--tk)'}},[arm.notes]));
+        ar.appendChild(nc);
+        const cs2=arm.armor_type==='light'?arm.ca+'+DES':arm.armor_type==='medium'?arm.ca+'+DES\u22642':arm.armor_type==='heavy'?String(arm.ca)+' fisso':arm.armor_type==='shield'?'+'+arm.ca:String(arm.ca);
+        ar.appendChild(mk('span',{style:{color:'var(--td)',fontSize:'11px',flexShrink:0}},['CA '+cs2]));
+        if(arm.stealth)ar.appendChild(mk('span',{style:{color:'var(--rl)',fontSize:'10px',flexShrink:0}},['\u26a0']));
+        if(arm.str_req>0)ar.appendChild(mk('span',{style:{color:'var(--tk)',fontSize:'10px',flexShrink:0}},['FOR '+arm.str_req+'+']));
+        if(!added){
+          const ab=BTN('+',function(){if(!C.equip.items)C.equip.items=[];C.equip.items.push({name:arm.name,ca:arm.ca,armor_type:arm.armor_type,des_bonus:arm.des_bonus,stealth:arm.stealth||false,str_req:arm.str_req||0,notes:arm.notes||'',worn:false,armory_id:arm.id});save();render();},'sm',{style:{flexShrink:0,padding:'2px 10px'}});
+          ar.appendChild(ab);
+        } else {ar.appendChild(mk('span',{style:{color:'var(--gold)',fontSize:'13px',flexShrink:0}},['\u2713']));}
+        armListDiv.appendChild(ar);
+      });
+    });
+    if(!found&&q)armListDiv.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'12px'}},['Nessuna armatura trovata']));
+
+    // Personalizzata
+    armListDiv.appendChild(mk('div',{style:{color:'var(--gold)',fontFamily:'var(--ft)',fontSize:'10px',letterSpacing:'1px',padding:'8px 4px 4px',textTransform:'uppercase'}},['Personalizzata']));
+    const cWrap=mk('div',{style:{border:'1px solid var(--border)',borderRadius:'var(--r)',padding:'8px',display:'flex',flexDirection:'column',gap:'6px'}});
+    const cName=mk('input',{type:'text',placeholder:'Nome armatura',style:{width:'100%',fontSize:'13px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',boxSizing:'border-box'}});
+    const cCa=mk('input',{type:'number',placeholder:'CA',style:{width:'56px',textAlign:'center',fontSize:'13px',padding:'4px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}});
+    const cTipo=mk('select',{style:{flex:'1',fontSize:'12px',padding:'4px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)'}});
+    [{v:'light',l:'Leggera (+DES)'},{v:'medium',l:'Media (+DES\u22642)'},{v:'heavy',l:'Pesante (fissa)'},{v:'shield',l:'Scudo (+CA)'},{v:'special',l:'Speciale (+DES)'}].forEach(function(x){cTipo.appendChild(mk('option',{value:x.v},[x.l]));});
+    const cStlChk=mk('input',{type:'checkbox',style:{width:'16px',height:'16px'}});
+    const cNotes=mk('input',{type:'text',placeholder:'Note (es. +1 magica)',style:{width:'100%',fontSize:'12px',padding:'4px 6px',background:'var(--card)',border:'1px solid var(--border)',borderRadius:'4px',color:'var(--text)',boxSizing:'border-box'}});
+    const cSave=BTN('Aggiungi e salva nel database',async function(){
+      const nm=cName.value.trim();
+      const ca=Number(cCa.value)||10;
+      const at=cTipo.value;
+      const des_bonus=at==='heavy'?'none':at==='medium'?'max2':'full';
+      const stl=cStlChk.checked;
+      const notes=cNotes.value.trim();
+      if(!nm){alert('Inserisci un nome');return;}
+      if(!sbUser){alert('Devi essere loggato');return;}
+      try{
+        const res=await sb.from('user_armory').insert({user_id:sbUser.id,name:nm,ca:ca,armor_type:at,des_bonus:des_bonus,stealth:stl,str_req:0,notes:notes,is_default:false}).select().single();
+        if(!res.error&&res.data){if(ARMORY_DB)ARMORY_DB.push(res.data);C.equip.items.push({name:nm,ca:ca,armor_type:at,des_bonus:des_bonus,stealth:stl,str_req:0,notes:notes,worn:false,armory_id:res.data.id});save();render();}
+        else alert('Errore: '+(res.error?res.error.message:'sconosciuto'));
+      }catch(e){alert('Errore: '+e.message);}
+    },'gold',{style:{width:'100%',fontSize:'12px'}});
+    cWrap.appendChild(cName);
+    cWrap.appendChild(ROW([mk('span',{style:{color:'var(--td)',fontSize:'12px',flexShrink:0}},['CA']),cCa,mk('span',{style:{color:'var(--td)',fontSize:'12px',flexShrink:0}},['Tipo']),cTipo],{gap:'6px',alignItems:'center'}));
+    cWrap.appendChild(ROW([cStlChk,mk('span',{style:{color:'var(--td)',fontSize:'12px'}},['Svantaggio Furtivit\u00e0'])],{gap:'6px',alignItems:'center'}));
+    cWrap.appendChild(cNotes);
+    cWrap.appendChild(cSave);
+    armListDiv.appendChild(cWrap);
+  }
+
+  armSrch.addEventListener('input',function(ev){renderArmoryInline(ev.target.value);});
+  renderArmoryInline('');
+  p.appendChild(equipCard);
 
   // ── Peso Inventario ──
   const carryNormal=C.str*5;
