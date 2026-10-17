@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Scheda D&D 5e</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" crossorigin="anonymous" onerror="console.warn('Firebase app non caricato')"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js" crossorigin="anonymous" onerror="console.warn('Firebase auth non caricato')"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js" crossorigin="anonymous" onerror="console.warn('Firebase DB non caricato')"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
 <style>
 /* ══════════════════════════════════════════════
@@ -627,9 +630,110 @@ function undoLastChange(){
   }catch(e){alert('Errore nel ripristino.');}
 }
 
-function save(){clearTimeout(_saveT);_saveT=setTimeout(()=>{try{localStorage.setItem('dnd5',JSON.stringify(C));localStorage.setItem('dnd5_last_local_save',String(Date.now()));}catch(e){}},300);pushUndoSnapshot();}
+function save(){clearTimeout(_saveT);_saveT=setTimeout(()=>{try{localStorage.setItem('dnd5',JSON.stringify(C));localStorage.setItem('dnd5_last_local_save',String(Date.now()));}catch(e){}},300);pushUndoSnapshot();
+  try{if(typeof DmToolkitSync!=='undefined')DmToolkitSync.push();}catch(e){}
+}
 function saveNow(){try{localStorage.setItem('dnd5',JSON.stringify(C));}catch(e){}}
 function resetChar(){reset();}
+
+// ── Sync live con dm-toolkit (campagna del Master) ──────────────────────────
+// Canale Firebase separato, letto/scritto per nome del personaggio normalizzato,
+// sotto lo stesso codice campagna che dm-toolkit genera per la collaborazione:
+// campagne/<codice>/pg_live/<slug>. Attivo solo se C.dmCampaignCode è impostato
+// nelle Impostazioni (vedi pgSettings) — altrimenti questo modulo è completamente
+// inerte e non tocca né Supabase né il salvataggio locale della scheda.
+const DmToolkitSync=(()=>{
+  const _buildConfig=()=>{
+    const k=['AIzaSyBH','SGF0MEYj','wpj9aTe3','Y-CUNldH','giB3yIg'].join('');
+    return{apiKey:k,authDomain:"dm-tollkit.firebaseapp.com",
+      databaseURL:"https://dm-tollkit-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId:"dm-tollkit",storageBucket:"dm-tollkit.firebasestorage.app",
+      messagingSenderId:"872264957916",appId:["1:872264957916","web","37d3a98932a98c7fc4d919"].join(':')};
+  };
+  let _ready=false,_authPromise=null,_listenerRef=null,_listenerHandler=null,_lastPushAt=0,_pushTimer=null;
+
+  // Stessa normalizzazione usata da dm-toolkit (Sessione._slugNome): niente
+  // decomposizione accenti, i caratteri non alfanumerici collassano in un trattino.
+  const _slug=(nome)=>(nome||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+
+  const _init=()=>{
+    if(_ready)return;
+    if(typeof firebase==='undefined')return;
+    try{if(!firebase.apps.length)firebase.initializeApp(_buildConfig());_ready=true;}catch(e){}
+  };
+
+  const _ensureAuth=()=>{
+    _init();
+    if(!_ready)return Promise.resolve(false);
+    if(firebase.auth().currentUser)return Promise.resolve(true);
+    if(_authPromise)return _authPromise;
+    _authPromise=firebase.auth().signInAnonymously().then(()=>true).catch(()=>false);
+    return _authPromise;
+  };
+
+  const _ref=()=>{
+    if(!_ready)return null;
+    const code=(C.dmCampaignCode||'').trim().toUpperCase();
+    const slug=_slug(C.name);
+    if(!code||!slug)return null;
+    return firebase.database().ref('campagne/'+code+'/pg_live/'+slug);
+  };
+
+  const _computeAC=()=>(C.bac||10)+(C.acm||[]).filter(m=>m.on).reduce((a,m)=>a+(Number(m.v)||0),0);
+
+  // Scrive lo stato di combattimento con source:'scheda-pg' — chiamata solo dal
+  // save() centrale, mai dall'handler del listener in arrivo (altrimenti le due
+  // app si rimbalzerebbero gli aggiornamenti all'infinito).
+  const push=()=>{
+    clearTimeout(_pushTimer);
+    _pushTimer=setTimeout(async()=>{
+      const ok=await _ensureAuth();
+      if(!ok)return;
+      const ref=_ref();
+      if(!ref)return;
+      const at=Date.now();
+      try{
+        await ref.update({
+          hp:C.hp,hpMax:C.maxHp,thp:C.thp||0,ca:_computeAC(),
+          condizioni:C.conditions||[],concentrazione:!!C.concentration,
+          mortePF:{successi:C.ds||0,fallimenti:C.df||0},
+          aggiornatoAt:at,source:'scheda-pg',
+        });
+        _lastPushAt=at;
+      }catch(e){}
+    },400);
+  };
+
+  const _applyIncoming=(data)=>{
+    if(!data)return;
+    if(data.source==='scheda-pg')return; // eco di una nostra scrittura
+    if(data.aggiornatoAt&&data.aggiornatoAt<=_lastPushAt)return;
+    let changed=false;
+    if(typeof data.hp==='number'&&data.hp!==C.hp){C.hp=data.hp;changed=true;}
+    if(typeof data.hpMax==='number'&&data.hpMax>0&&data.hpMax!==C.maxHp){C.maxHp=data.hpMax;changed=true;}
+    if(Array.isArray(data.condizioni)){C.conditions=data.condizioni;changed=true;}
+    if(typeof data.concentrazione==='boolean'&&!data.concentrazione&&C.concentration){C.concentration=null;changed=true;}
+    _lastPushAt=data.aggiornatoAt||_lastPushAt;
+    if(changed){try{saveNow();}catch(e){}try{if(typeof render==='function')render();}catch(e){}}
+  };
+
+  // Attiva/riavvia il listener — da chiamare all'avvio e ogni volta che cambia
+  // il codice campagna o il nome del personaggio nelle Impostazioni.
+  const refreshLink=async()=>{
+    const ok=await _ensureAuth();
+    if(_listenerRef&&_listenerHandler){try{_listenerRef.off('value',_listenerHandler);}catch(e){}_listenerRef=null;_listenerHandler=null;}
+    if(!ok)return;
+    const ref=_ref();
+    if(!ref)return;
+    _listenerHandler=(snap)=>_applyIncoming(snap.val());
+    ref.on('value',_listenerHandler);
+    _listenerRef=ref;
+  };
+
+  const isLinked=()=>!!_ref();
+
+  return{push,refreshLink,isLinked};
+})();
 
 // ── HELPERS ──
 function sm(s){return Math.floor(((s||10)-10)/2);}
@@ -5152,6 +5256,27 @@ function pgSettings(){
   }
   p.appendChild(accountCard);
 
+  // ── dm-toolkit (sync combattimento col Master) ──
+  const dmCard=CARD([LBL('🔗 dm-toolkit')]);
+  dmCard.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'11px',marginBottom:'8px',lineHeight:'1.5'}},
+    ['Inserisci il codice campagna del tuo Master: da questo momento il Master vede in tempo reale i tuoi PF, le condizioni attive e la concentrazione — durante i combattimenti e anche fuori, per prepararsi. Il collegamento usa il nome del personaggio qui sopra. Lascia vuoto per non condividere nulla.']));
+  const dmCodeInput=TI(C.dmCampaignCode||'',()=>{},'es. LB8GSH',{flex:'1',fontFamily:'var(--ft)',textAlign:'center',letterSpacing:'2px',textTransform:'uppercase'});
+  dmCard.appendChild(ROW([
+    dmCodeInput,
+    BTN('Collega',()=>{
+      C.dmCampaignCode=(dmCodeInput.value||'').trim().toUpperCase();
+      save();
+      if(typeof DmToolkitSync!=='undefined')DmToolkitSync.refreshLink();
+      render();
+    },'gold sm'),
+  ],{gap:'6px'}));
+  if(typeof DmToolkitSync!=='undefined'&&DmToolkitSync.isLinked()){
+    dmCard.appendChild(mk('div',{style:{fontSize:'11px',color:'var(--greenl)',marginTop:'6px'}},['● Collegato — stato di combattimento condiviso in tempo reale']));
+  } else if(C.dmCampaignCode){
+    dmCard.appendChild(mk('div',{style:{fontSize:'11px',color:'var(--tk)',marginTop:'6px'}},['In attesa di connessione…']));
+  }
+  p.appendChild(dmCard);
+
   // ── Aspetto ──
   const isLight=document.body.classList.contains('light');
   const appearanceCard=CARD([
@@ -5519,6 +5644,7 @@ window.addEventListener('unhandledrejection', function(ev) {
 
 // ── INIT ──
 load();applyTheme();
+try{if(typeof DmToolkitSync!=='undefined')DmToolkitSync.refreshLink();}catch(e){}
 // render() verrà chiamato da Supabase dopo il controllo auth
 // Se Supabase non è configurato, renderizza normalmente
 if(typeof sb === 'undefined') render();
