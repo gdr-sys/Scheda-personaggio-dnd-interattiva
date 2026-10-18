@@ -541,7 +541,12 @@ const DEF={
   res:[],ins:0,maxIns:1,ds:0,df:0,te:[],
   concentration:null, // {name, duration} incantesimo in concentrazione
   resistances:[], immunities:[], vulnerabilities:[], condImmunities:[],
-  equip:{armor:'',shield:false},
+  // Di default un personaggio nuovo è "senza armatura" (CA = 10+DES, calcolata in automatico
+  // e tenuta sincronizzata col DES a ogni render — vedi pgMain). L'opzione vuota del menu
+  // Armatura resta disponibile e passa a CA "Personalizzata": da quel momento il campo Base
+  // sotto la CA Totale è un numero libero che l'utente imposta a mano (serve per difese non
+  // standard come la Difesa Senza Armatura di Barbaro/Monaco, basate su altre caratteristiche).
+  equip:{armor:'Nessuna (senza armatura)',shield:false},
   showXpTracker:false, xpTarget:0,
   pt:"",id:"",bo:"",fl:"",app:"",bs:"",nt:"",img:"",
   coins:{pp:0,gp:0,ep:0,sp:0,cp:0,coinsBag:false},
@@ -1756,6 +1761,14 @@ function pgMain(){
   const SK=['str','dex','con','int','wis','cha'];
   const SN={str:'For',dex:'Des',con:'Cos',int:'Int',wis:'Sag',cha:'Car'};
   function skB(k){const s=C.sk[k];return(S[s.s]||0)+(s.e?pb*2:s.p?pb:0)+(Number((C.skBonus||{})[k])||0);}
+  // Se è equipaggiata un'armatura reale (non "Personalizzata"), la CA base dipende dal DES
+  // e va ricalcolata a ogni render — altrimenti restava quella calcolata al momento della
+  // scelta dall'elenco, e un cambio di DES successivo (es. level-up) non si rifletteva più
+  // in CA/Iniziativa finché non si riselezionava l'armatura o si cambiava pagina.
+  if(C.equip&&C.equip.armor){
+    const recalcBac=calcArmorAc(C.equip.armor,S.dex);
+    if(recalcBac!==null)C.bac=recalcBac;
+  }
   const acT=(C.bac||10)+(C.acm||[]).filter(m=>m.on).reduce((a,m)=>a+(Number(m.v)||0),0);
 
   const p=mk('div',{cls:'page'});
@@ -1950,7 +1963,7 @@ function pgMain(){
   const statsGrid=GRID(SK.map(k=>{
     const modDiv=mk('div',{style:{fontSize:'24px',color:'var(--gl)',fontFamily:'var(--ft)',cursor:'pointer',lineHeight:'1',textAlign:'center'}},[fm(S[k])]);
     const inp=mk('input',{type:'text',value:String(C[k]),style:{width:'100%',fontSize:'12px',marginTop:'2px',textAlign:'center'}});
-    inp.addEventListener('change',ev=>{C[k]=Math.max(1,Math.min(30,Number(ev.target.value)||10));modDiv.textContent=fm(sm(C[k]));save();});
+    inp.addEventListener('change',ev=>{C[k]=Math.max(1,Math.min(30,Number(ev.target.value)||10));save();render();});
     modDiv.addEventListener('click',()=>showRoll('1d20'+fm(sm(C[k])),SN[k]));
     const card=CARD([LBL(SN[k]),modDiv,inp],{textAlign:'center',padding:'8px'});
     return card;
@@ -2608,6 +2621,11 @@ function pgSkills(){
 function pgCombat(){
   const pb=C.prof||2;
   const S={str:sm(C.str),dex:sm(C.dex),con:sm(C.con),int:sm(C.int),wis:sm(C.wis),cha:sm(C.cha)};
+  // Stessa sincronizzazione CA/DES di pgMain — vedi commento li' per il perche'.
+  if(C.equip&&C.equip.armor){
+    const recalcBac=calcArmorAc(C.equip.armor,S.dex);
+    if(recalcBac!==null)C.bac=recalcBac;
+  }
   const p=mk('div',{cls:'page'});
   const rp=document.getElementById('rpop');
   function skB(k){const s=C.sk[k];return(S[s.s]||0)+(s.e?pb*2:s.p?pb:0)+(Number((C.skBonus||{})[k])||0);}
@@ -3690,10 +3708,23 @@ function pgInventory(){
 
   function renderArmoryInline(q){
     armListDiv.innerHTML='';
-    const armory=ARMORY_DB||[];
-    if(!armory.length){
+    // Il "database armature" qui è la lista di armature personalizzate salvate sull'account
+    // cloud (tabella Supabase user_armory) — richiede un login Google, non è un catalogo
+    // generale. Senza questo lo stato "non ancora caricato" (non loggata) e "caricamento in
+    // corso" (loggata, risposta non ancora arrivata) sembravano identici: un messaggio di
+    // caricamento che si ripeteva all'infinito ogni secondo anche per chi non era loggata.
+    if(typeof sbUser==='undefined'||!sbUser){
+      armListDiv.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'16px'}},['Accedi con Google (Impostazioni) per salvare e cercare qui le tue armature personalizzate.']));
+      return;
+    }
+    if(ARMORY_DB===null){
       armListDiv.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'16px'}},['Caricamento database...']));
       setTimeout(function(){renderArmoryInline(armSrch.value);},1000);
+      return;
+    }
+    const armory=ARMORY_DB||[];
+    if(!armory.length){
+      armListDiv.appendChild(mk('div',{style:{color:'var(--tk)',fontSize:'12px',textAlign:'center',padding:'16px'}},['Nessuna armatura personalizzata salvata ancora.']));
       return;
     }
     const types=['light','medium','heavy','shield','special'];
@@ -6106,7 +6137,16 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (loginBtn) loginBtn.style.display  = 'inline-block';
     if (userInfo) userInfo.style.display  = 'none';
     if (syncEl)   syncEl.style.display    = 'none';
-    sbShowLogin();
+    // La scheda funziona interamente in locale (localStorage) senza bisogno di un
+    // account — l'accesso Google è solo per chi vuole il sync multi-dispositivo,
+    // raggiungibile in qualsiasi momento da Impostazioni. In precedenza qui si
+    // mostrava sempre la schermata di login, bloccando l'uso locale della scheda:
+    // ora si procede con la nav visibile e i dati gia' salvati in locale (o una
+    // scheda vuota al primissimo avvio), esattamente come l'avvio senza Supabase
+    // configurato (vedi commento "INIT" piu' sotto).
+    document.getElementById('nav').style.display = '';
+    load();
+    render();
   }
 });
 
